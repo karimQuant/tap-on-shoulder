@@ -1,12 +1,16 @@
 name: release
-# Builds the `tap` binary for every supported target with the model embedded,
-# attests build provenance, and (on a bin-v* tag push only) publishes a GitHub
-# PRERELEASE with the binaries and SHA256SUMS.
+# Builds the `tap` binary for every supported target with the model embedded.
+# On a bin-v* tag push only, it then attests build provenance (the `attest`
+# job, the only one holding id-token/attestations write) and publishes a
+# GitHub PRERELEASE with the binaries and SHA256SUMS. workflow_dispatch only
+# builds: it never attests and never publishes.
 #
 # Post-release runbook (manual, in order):
 #   1. For each asset, verify provenance before trusting it:
 #        gh release download bin-v<version> --repo karimQuant/tap-on-shoulder
-#        gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder
+#        gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder \
+#          --source-ref refs/tags/bin-v<version> \
+#          --signer-workflow karimQuant/tap-on-shoulder/.github/workflows/release.yml
 #   2. Check SHA256SUMS against the downloaded files (sha256sum -c SHA256SUMS),
 #      then copy its lines into scripts/checksums.txt below `version=<version>`,
 #      and commit that change.
@@ -17,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Build and attest only; never publish"
+        description: "Build only; never attest or publish"
         type: boolean
         default: true
 
@@ -43,8 +47,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      id-token: write
-      attestations: write
     env:
       TARGET: ${{ matrix.target }}
     steps:
@@ -88,9 +90,6 @@ jobs:
           else
             (cd dist && shasum -a 256 "tap-$TARGET") | tee -a "$GITHUB_STEP_SUMMARY"
           fi
-      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
-        with:
-          subject-path: dist/tap-${{ matrix.target }}
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: tap-${{ matrix.target }}
@@ -98,8 +97,33 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
-  publish:
+  attest:
     needs: build
+    # Same condition as publish: provenance is only ever signed for a tag push.
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/bin-v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: tap-*
+          path: dist
+          merge-multiple: true
+      - name: four binaries present
+        run: |
+          set -eu
+          cd dist
+          set -- tap-*
+          test "$#" -eq 4
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/tap-*
+
+  publish:
+    needs: [build, attest]
     # A tag push only; workflow_dispatch (dry run or not) never publishes.
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/bin-v') }}
     runs-on: ubuntu-latest

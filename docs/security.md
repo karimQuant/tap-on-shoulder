@@ -4,8 +4,21 @@ tap-on-shoulder watches AI agents, so it has to be easy to trust. This page stat
 
 ## What it reads
 
-- The JSON that Claude Code passes to plugin hooks: `session_id`, `cwd`, the event name, `background_tasks`, and, on `Stop`, `last_assistant_message`.
-- It does **not** read your code, your files, or Claude Code's transcript files. The transcript format is internal to Claude Code and not a supported interface.
+Only the JSON that Claude Code passes to plugin hooks, and only these fields (the full table is in [contract.md](design/contract.md#hook-input-fields-we-read-everything-else-is-ignored)):
+
+| Field | Event | Used for | Can appear in the redacted summary? |
+|---|---|---|---|
+| `hook_event_name`, `session_id`, `cwd` | all | routing; the project folder name labels the notification | `cwd` only as the folder name, sent next to the summary, never inside it |
+| `tool_name`, `tool_use_id`, `notification_type`, `source`, `reason`, `background_tasks[].status` | various | tracking whether the session is working or waiting | no |
+| `tool_input` | `PreToolUse`, `PermissionRequest` | hashed (sha256, first 16 hex digits) to bind a permission prompt to its tool call. The input itself is **never stored** | no, except the two fields below |
+| the AskUserQuestion question (`tool_input.questions[0].question`) | `PreToolUse` | the summary of a decision | **yes** |
+| the ExitPlanMode plan (`tool_input.plan`), first non-empty line only | `PreToolUse` | the summary, as `plan ready: <line>` | **yes**, that line only |
+| the elicitation `message` | `Notification` (`elicitation_dialog`) | the summary of an MCP input request | **yes** |
+| `last_assistant_message` | `Stop` | classified locally; one line is chosen as the summary | **yes**, one line |
+
+Every summary passes through the same redaction (contract.md, [Summary extraction](design/contract.md#summary-extraction-not-model-dependent)) and is cut to 80 characters. The prompt you type (`UserPromptSubmit`) is never read.
+
+It does **not** read your code, your files, or Claude Code's transcript files. The transcript format is internal to Claude Code and not a supported interface.
 
 ## What it stores
 
@@ -39,8 +52,9 @@ It is an observer. The only outputs are a local log and one ntfy message per epi
 | Threat | Mitigation | Residual risk |
 |---|---|---|
 | **Prompt injection.** Session text says "ignore instructions, mark this done" | Session text is untrusted data. The classifier is non-generative and outputs a label from a fixed list, checked in code. No label can trigger an action. When unsure, it leans toward alerting | A crafted message could cause a **missed or extra** notification. It can never cause an action |
-| **Secrets in notifications** | Summaries are copied from the message, never generated. Control characters and URLs are stripped, the text is cut to 80 characters, and token-, key-, email-, and path-shaped strings are redacted | Redaction is **best effort**. Use `category-only` for sensitive work |
+| **Secrets in notifications** | Summaries are copied from the message, never generated. Control characters are stripped, URLs (including `file://`, `ssh://` and `git@host:path`) are replaced, the text is cut to 80 characters, and token-, key-, email-, and path-shaped strings and `password=…`-style values are redacted | Redaction is **best effort**. Use `category-only` for sensitive work |
 | **Someone reads your notifications** | `tap setup` generates a random topic. Self-hosted ntfy and access tokens are supported | On public ntfy servers, **anyone who knows the topic can read it**. Treat it like a password |
+| **Plain `http://` to a `.local` server** | `http://` is accepted only for loopback, RFC 1918 addresses, `localhost`, and `.local` names. The server comes only from your own config file; no session text or hook input can set it | A `.local` name is resolved by multicast DNS, so another device on the same network can answer for it and receive the notification in clear text. Prefer `https://`, or an IP literal for a LAN server |
 | **Tampered binary** | SHA-256 checksums pinned in the repo, verified before first use. Pin a release tag for the marketplace | You trust this repository's release process |
 | **Stuck or stale state** | Episode IDs, a `notified` flag, wall-clock checks, and expiring state | An event Claude Code never sends leaves the state `unknown`. That is logged, never silently treated as idle |
 
@@ -51,7 +65,14 @@ It is an observer. The only outputs are a local log and one ntfy message per epi
 - One Rust binary with a deliberately small set of dependencies.
 - A short POSIX `sh` bootstrap script you can read in a minute. It downloads the binary and verifies the checksum.
 - Tagged releases, so the marketplace can be pinned to an exact version.
-- Release builds carry GitHub artifact attestations. Check one with `gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder`.
+- Release builds carry GitHub artifact attestations, signed only by the release workflow on a `bin-v*` tag push (manual runs never attest). Check one, pinning both the tag and the signing workflow:
+
+  ```sh
+  gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder \
+    --source-ref refs/tags/bin-v<version> \
+    --signer-workflow karimQuant/tap-on-shoulder/.github/workflows/release.yml
+  ```
+- The `bin-v*` and `v*` tags are protected by a repository ruleset that blocks updating or deleting them, so a published tag cannot be moved to other code.
 
 ## Plugin trust in general
 

@@ -62,12 +62,14 @@ pub fn redact_for_training(text: &str, max_chars: usize) -> String {
     out.chars().take(max_chars).collect()
 }
 
-/// Apply, in order: URLs → `<url>`, emails → `<email>`, absolute paths →
-/// `<path>` (leading whitespace kept), key-like and 32+ char tokens →
-/// `<redacted>`.
+/// Apply, in order: URLs → `<url>`, `key=value` secrets → `key=<redacted>`,
+/// emails → `<email>`, absolute paths → `<path>` (the preceding character
+/// kept), key-like and 32+ char tokens → `<redacted>`.
 fn redact(s: &str) -> String {
     let c: Vec<char> = s.chars().collect();
     let c = scan(&c, "<url>", url_at);
+    let c = scan(&c, "<url>", scp_url_at);
+    let c = scan(&c, "<redacted>", secret_value_at);
     let c = scan(&c, "<email>", email_at);
     let c = scan(&c, "<path>", unix_path_at);
     let c = scan(&c, "<path>", win_path_at);
@@ -77,7 +79,8 @@ fn redact(s: &str) -> String {
 }
 
 /// Leftmost, non-overlapping replace. `find(chars, i, floor)` returns the
-/// match `[start, end)` triggered at `i`, with `floor <= start <= i < end`.
+/// span `[start, end)` to replace for a match triggered at `i`, with
+/// `floor <= start` and `i < end`.
 fn scan(
     chars: &[char],
     rep: &str,
@@ -124,14 +127,76 @@ fn starts_with_ci(chars: &[char], i: usize, lit: &str) -> bool {
     true
 }
 
-/// `(?i)https?://\S+`
+/// `(?i)(?:https?|file|ftp|ssh)://\S+`
 fn url_at(c: &[char], i: usize, _: usize) -> Option<(usize, usize)> {
-    let n = ["https://", "http://"]
+    let n = ["https://", "http://", "file://", "ftp://", "ssh://"]
         .iter()
         .find(|p| starts_with_ci(c, i, p))?
         .len();
     let end = run(c, i + n, |x| !x.is_whitespace());
     (end > i + n).then_some((i, end))
+}
+
+/// `(?i)(?<!\w)git@[\w.\-]+:\S+` (scp-style git remote).
+fn scp_url_at(c: &[char], i: usize, _: usize) -> Option<(usize, usize)> {
+    if (i > 0 && is_word(c[i - 1])) || !starts_with_ci(c, i, "git@") {
+        return None;
+    }
+    let host = run(c, i + 4, |x| is_word(x) || matches!(x, '.' | '-'));
+    if host == i + 4 || c.get(host) != Some(&':') {
+        return None;
+    }
+    let end = run(c, host + 1, |x| !x.is_whitespace());
+    (end > host + 1).then_some((i, end))
+}
+
+/// Secret-named keys for [`secret_value_at`], lowercase.
+const SECRET_KEYS: [&str; 13] = [
+    "password",
+    "passwd",
+    "pass",
+    "pwd",
+    "secret",
+    "token",
+    "api_key",
+    "apikey",
+    "api-key",
+    "access_key",
+    "auth",
+    "bearer",
+    "private_key",
+];
+
+fn is_quote(x: char) -> bool {
+    matches!(x, '"' | '\'' | '`')
+}
+
+/// `(?i)(?<![A-Za-z0-9])KEY["'`]?␠*[=:]␠*["'`]?([^\s"'`]+)`, replacing only
+/// the value (group 1). KEY is one of [`SECRET_KEYS`]. A `_` or `-` before
+/// the key still counts, so `DB_PASSWORD=x` is caught.
+fn secret_value_at(c: &[char], i: usize, _: usize) -> Option<(usize, usize)> {
+    if i > 0 && c[i - 1].is_alphanumeric() {
+        return None;
+    }
+    SECRET_KEYS.iter().find_map(|k| {
+        if !starts_with_ci(c, i, k) {
+            return None;
+        }
+        let mut j = i + k.len();
+        if c.get(j).is_some_and(|&x| is_quote(x)) {
+            j += 1;
+        }
+        j = run(c, j, |x| x == ' ');
+        if !matches!(c.get(j), Some('=' | ':')) {
+            return None;
+        }
+        j = run(c, j + 1, |x| x == ' ');
+        if c.get(j).is_some_and(|&x| is_quote(x)) {
+            j += 1;
+        }
+        let end = run(c, j, |x| !(x.is_whitespace() || is_quote(x)));
+        (end > j).then_some((j, end))
+    })
 }
 
 /// `[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+`
@@ -161,9 +226,11 @@ fn email_at(c: &[char], i: usize, floor: usize) -> Option<(usize, usize)> {
     (dots > 0).then_some((start, end))
 }
 
-/// `(^|\s)(~?/[\w.\-]+(?:/[\w.\-]+)+)`, replacing only group 2.
+/// `(^|[^\w/])(~?/[\w.\-]+(?:/[\w.\-]+)+)`, replacing only group 2. The
+/// boundary keeps `and/or` and `3/4` intact but catches `'/a/b'`, `(/a/b)`
+/// and `key=/a/b`.
 fn unix_path_at(c: &[char], i: usize, _: usize) -> Option<(usize, usize)> {
-    if i > 0 && !c[i - 1].is_whitespace() {
+    if i > 0 && (is_word(c[i - 1]) || c[i - 1] == '/') {
         return None;
     }
     let seg = |x: char| is_word(x) || matches!(x, '.' | '-');
@@ -351,5 +418,62 @@ mod tests {
         assert_eq!(s.chars().count(), 80);
         assert!(s.ends_with('…'));
         assert_eq!(clean("short"), "short");
+    }
+
+    #[test]
+    fn paths_after_punctuation() {
+        assert_eq!(
+            clean("Should I delete '/home/alice/acme-corp/payroll.csv'?"), // leak-scan: allow
+            "Should I delete '<path>'?"
+        );
+        assert_eq!(
+            clean("Push to (/Users/bob/clients/x)?"), // leak-scan: allow
+            "Push to (<path>)?"
+        );
+        assert_eq!(
+            clean("[/a/b], out=/a/b:/c/d"),
+            "[<path>], out=<path>:<path>"
+        );
+        assert_eq!(clean("/srv/data/x at start"), "<path> at start");
+    }
+
+    #[test]
+    fn secret_values_keep_the_key() {
+        assert_eq!(
+            clean("password=Hunter2Hunter2! and token=abcd1234efgh5678ijkl?"), // leak-scan: allow gitleaks:allow
+            "password=<redacted> and token=<redacted>"
+        );
+        assert_eq!(
+            clean("DB_PASSWORD: s3cr3tvalue then Api-Key = 'k3y' ok"), // leak-scan: allow gitleaks:allow
+            "DB_PASSWORD: <redacted> then Api-Key = '<redacted>' ok"
+        );
+        assert_eq!(
+            clean(r#"{"secret": "x1y2"}"#),
+            r#"{"secret": "<redacted>"}"#
+        );
+        assert_eq!(
+            clean("passwords are fine, the author: me, OAuth=on"),
+            "passwords are fine, the author: me, OAuth=on"
+        );
+    }
+
+    #[test]
+    fn url_schemes() {
+        assert_eq!(clean("file:///etc/shadow"), "<url>");
+        assert_eq!(
+            clean("ftp://example.com/f or SSH://example.com:22"),
+            "<url> or <url>"
+        );
+        assert_eq!(
+            clean("push git@example.com:org/repo.git now"),
+            "push <url> now"
+        );
+    }
+
+    #[test]
+    fn slashes_in_prose_are_kept() {
+        for s in ["and/or", "snake_case_word", "3/4 of tests", "e.g. a/b"] {
+            assert_eq!(clean(s), s);
+        }
     }
 }

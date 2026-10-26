@@ -32,3 +32,6 @@ Claude Code doesn't emit a hook event when you cancel or deny a permission promp
 
 **What if a permission prompt is approved and the tool then runs for 20 minutes?**
 Before tapping, the plugin checks whether the approved tool's process is running and postpones the tap while it is, for up to 10 minutes. Tools that run inside an existing process, such as some MCP calls, can't be detected and may cause one extra tap.
+
+**Can I check what it would say about a message?**
+Yes. Save the message to a file and run `tap classify < file.txt`. It prints the category, the redacted summary that would be sent, and the model's probabilities. It is diagnostic only: it writes no state and sends nothing.
