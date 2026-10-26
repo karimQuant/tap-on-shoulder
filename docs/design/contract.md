@@ -134,7 +134,7 @@ The chosen line has markdown markers removed (`#`, `*`, `_`, `` ` ``, `>`, list 
 
 **`input_hash`:** the first 16 hex digits of the sha256 of `tool_input`, re-serialized as compact JSON with object keys sorted recursively. Python uses `json.dumps(v, sort_keys=True, separators=(",",":"), ensure_ascii=False)`, and Rust uses an equivalent canonical writer.
 
-**Limits:** stdin is read fully, because hooks must drain it, up to 64 MiB. Large `Write` and `Edit` payloads are normal. If the input is larger than that or malformed, log `kind=bad_input` and exit 0.
+**Limits:** stdin is read fully, because hooks must drain it, up to 8 MiB. Large `Write` and `Edit` payloads are normal. Larger input logs `kind=oversize`, malformed input logs `kind=bad_input`; both exit 0.
 
 ## State schema
 

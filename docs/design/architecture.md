@@ -101,7 +101,7 @@ There is one file per session, with the `SessionState` schema from [contract.md]
 
 ## Security boundaries
 
-- **Untrusted input.** Hook stdin is untrusted. It is parsed with `serde` into typed structs and capped at 64 MiB. Messages are truncated to 16 KiB before classification.
+- **Untrusted input.** Hook stdin is untrusted. It is parsed with `serde` into typed structs and capped at 8 MiB. Messages are truncated to 16 KiB before classification.
 - **No session text in commands.** Session text never reaches a command line, an environment variable, a file path, an HTTP header, or the log.
 - **Classifier output.** An enum, plus a summary that is copied (never generated), sanitized, and redacted.
 - **Network egress.** Only the configured ntfy server, as a JSON POST over HTTPS:
