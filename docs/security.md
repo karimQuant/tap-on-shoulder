@@ -28,7 +28,9 @@ The plugin keeps one small state file per session, in the plugin's data director
 - timestamps
 - category
 - the redacted summary
-- whether a notification was sent
+- whether a notification was sent (episode status and attempt count)
+- pending tool calls: tool name, `tool_use_id`, and a truncated SHA-256 hash of the tool input (never the input itself)
+- the Claude Code process ID and start time, to tell whether the session is still running
 
 It **never** stores the full assistant message. Old state expires automatically.
 
@@ -56,7 +58,7 @@ It is an observer. The only outputs are a local log and one ntfy message per epi
 | **Someone reads your notifications** | `tap setup` generates a random topic. Self-hosted ntfy and access tokens are supported | On public ntfy servers, **anyone who knows the topic can read it**. Treat it like a password |
 | **Plain `http://` to a `.local` server** | `http://` is accepted only for loopback, RFC 1918 addresses, `localhost`, and `.local` names. The server comes only from your own config file; no session text or hook input can set it | A `.local` name is resolved by multicast DNS, so another device on the same network can answer for it and receive the notification in clear text. Prefer `https://`, or an IP literal for a LAN server |
 | **Tampered binary** | SHA-256 checksums pinned in the repo, verified before first use. Pin a release tag for the marketplace | You trust this repository's release process |
-| **Stuck or stale state** | Episode IDs, a `notified` flag, wall-clock checks, and expiring state | An event Claude Code never sends leaves the state `unknown`. That is logged, never silently treated as idle |
+| **Stuck or stale state** | Episode IDs, a `sending` claim taken under a lock before each send, wall-clock checks, and expiring state | An event Claude Code never sends leaves the state `unknown`. That is logged, never silently treated as idle |
 
 **Out of scope:** a compromised local user account, a compromised Claude Code install, and the security of the ntfy server you choose.
 

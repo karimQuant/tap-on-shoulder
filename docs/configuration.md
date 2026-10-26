@@ -3,7 +3,7 @@
 > [!NOTE]
 > These keys are implemented in v0.1. `/tap-on-shoulder:setup` writes a starter file, and `/tap-on-shoulder:doctor` reports invalid or ignored keys.
 
-The configuration lives in `~/.config/tap-on-shoulder/config.toml` (or under `$XDG_CONFIG_HOME`). A project can override some keys (see below). `tap config check` validates both.
+The configuration lives in `~/.config/tap-on-shoulder/config.toml` (or under `$XDG_CONFIG_HOME`). A project can override some keys (see below). `/tap-on-shoulder:doctor` (or `tap doctor`) validates both and lists every invalid or ignored key.
 
 ```toml
 [grace]                 # continuous waiting time before a tap, per category
@@ -18,7 +18,7 @@ repeat     = "off"      # one tap per waiting episode; e.g. "30m" in a later rel
 
 [classifier]
 mode = "model"          # model | rules
-lean = "alert"          # when unsure, prefer tapping over staying silent
+lean = "alert"          # alert | balanced
 
 [notify.ntfy]
 server    = "https://ntfy.sh"     # or your self-hosted server
@@ -43,8 +43,8 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 | `alerts.completion` | `false` | Also tap when a task finishes |
 | `alerts.info` | `false` | Also tap on informational stops |
 | `alerts.repeat` | `off` | Re-notify interval for the same episode (later release) |
-| `classifier.mode` | `model` | `rules` turns off the embedded model |
-| `classifier.lean` | `alert` | What to do when the classifier is unsure |
+| `classifier.mode` | `model` | `model` uses the embedded head when the build has one (else the rules). `rules` always uses the rules classifier. User config only |
+| `classifier.lean` | `alert` | Decision rule for the model head. `alert`: if `p(needs_decision) + p(blocked)` ≥ head.json's `lean_threshold` (0.35 shipped), the higher of those two wins, else argmax. `balanced`: plain argmax. No effect with `mode = "rules"`. User config only |
 | `notify.ntfy.server` | `https://ntfy.sh` | ntfy server URL |
 | `notify.ntfy.topic` | random | Your topic. On public servers it works like a password |
 | `notify.ntfy.token_env` | unset | Environment variable that holds an ntfy access token |
@@ -55,7 +55,7 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 
 | Variable | Purpose |
 |---|---|
-| `TAP_GRACE_OVERRIDE` | Overrides every grace period, e.g. `10s` for testing |
+| `TAP_GRACE_OVERRIDE` | Overrides every grace period (1s–24h), e.g. `TAP_DEV=1 TAP_GRACE_OVERRIDE=10s` for testing. Ignored, with an `env_ignored` log entry, unless `TAP_DEV=1` is also set |
 | `TAP_NTFY_TOKEN` | ntfy access token, if you set `token_env` to this name |
 
 Secrets never go in the config file. Reference them through environment variables instead.

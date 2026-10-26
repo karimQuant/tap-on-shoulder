@@ -1,7 +1,9 @@
 //! Rust ↔ Python parity (contract.md, "Parity fixtures").
 //!
 //! - `tests/fixtures/parity.json` (from `model/export.py`): ids, features,
-//!   probabilities, and labels must match. Skips with a message until it exists.
+//!   probabilities, and labels must match; ≥ 50 fixtures, ≥ 10 of them with
+//!   `|p0+p1 - lean_threshold| < 0.15`. Skips with a message until it exists,
+//!   unless `TAP_REQUIRE_MODEL=embed` (then a missing file or model fails).
 //! - `tests/fixtures/wordpiece_golden.json`: token ids from HF `tokenizers` for
 //!   synthetic strings. `TAP_WORDPIECE_GOLDEN=<file>` checks an extra file of
 //!   the same shape (used for large fuzz runs).
@@ -28,24 +30,50 @@ fn cosine(a: &[f32], b: &[f32]) -> f64 {
     dot / (na * nb)
 }
 
+/// `TAP_REQUIRE_MODEL=embed` (the `model` CI job, release builds) turns every
+/// skip in this file into a failure.
+fn model_required() -> bool {
+    std::env::var("TAP_REQUIRE_MODEL").as_deref() == Ok("embed")
+}
+
+const MIN_FIXTURES: usize = 50;
+const MIN_NEAR_THRESHOLD: usize = 10;
+const NEAR: f32 = 0.15;
+
 #[test]
 fn parity_fixtures() {
     let path = fixture("parity.json");
     if !path.exists() {
+        assert!(
+            !model_required(),
+            "TAP_REQUIRE_MODEL=embed but tests/fixtures/parity.json is missing"
+        );
         eprintln!("SKIP parity_fixtures: tests/fixtures/parity.json not present yet");
         return;
     }
     let fixtures: Vec<ParityFixture> =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).expect("parity.json");
-    assert!(!fixtures.is_empty(), "parity.json is empty");
     let h = head::LinearHead::embedded().expect("assets/head.json");
+    assert!(
+        fixtures.len() >= MIN_FIXTURES,
+        "parity.json has {} fixtures, need ≥ {MIN_FIXTURES}",
+        fixtures.len()
+    );
+    let near = fixtures
+        .iter()
+        .filter(|fx| (fx.probs[0] + fx.probs[1] - h.lean_threshold).abs() < NEAR)
+        .count();
+    assert!(
+        near >= MIN_NEAR_THRESHOLD,
+        "parity.json has {near} fixtures with |p0+p1 - lean_threshold| < {NEAR}, need ≥ {MIN_NEAR_THRESHOLD}"
+    );
     let need_model = h.variant == head::Variant::Embed;
     if classify::model_status() != "embedded" && need_model {
         // Builds without the model (plain CI jobs) cannot check embed parity.
         // The `model` CI job and release builds set TAP_REQUIRE_MODEL=embed,
         // which makes build.rs fail without assets and this test mandatory.
         assert!(
-            std::env::var("TAP_REQUIRE_MODEL").as_deref() != Ok("embed"),
+            !model_required(),
             "TAP_REQUIRE_MODEL=embed but the model is absent"
         );
         eprintln!("SKIP parity_fixtures: model absent (run scripts/fetch-model.sh)");
@@ -111,6 +139,10 @@ fn check_golden(path: &Path) -> usize {
 #[test]
 fn wordpiece_matches_hf_golden() {
     if classify::model_status() != "embedded" {
+        assert!(
+            !model_required(),
+            "TAP_REQUIRE_MODEL=embed but the model assets are absent"
+        );
         eprintln!("SKIP wordpiece_matches_hf_golden: model assets absent");
         return;
     }

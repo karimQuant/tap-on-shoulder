@@ -1,63 +1,56 @@
-title: "tap-on-shoulder — PROPOSED workflow (not implemented)" {near: top-center; shape: text; style.font-size: 22}
+title: "tap-on-shoulder — v0.1 workflow" {near: top-center; shape: text; style.font-size: 22}
 direction: down
 
 install: "1 · Install (once)" {
   direction: right
   add: "/plugin marketplace add <repo>"
   inst: "/plugin install tap-on-shoulder"
-  first: "First hook run:\nfetch classifier bundle\n→ plugin-data\n(SHA-256 verified)"
-  fallback: "Offline / failed?\n→ rules-only mode\n(logged, never silent)" {style.stroke-dash: 3}
+  first: "First hook run:\nbackground install of the tap binary\n→ plugin-data/bin\n(SHA-256 verified)"
+  fallback: "Not installed yet?\n→ no taps, one-line\nSessionStart warning" {style.stroke-dash: 3}
   add -> inst -> first
-  first -> fallback: "on error" {style.stroke-dash: 3}
+  first -> fallback: "until done" {style.stroke-dash: 3}
 }
 
-session: "2 · Every Claude Code session (foreground, background, worktree)" {
+session: "2 · Every Claude Code session" {
   claude: "Claude Code session\n(session_id, cwd)" {shape: rectangle}
-  hooks: "Plugin hooks\n(hooks/hooks.json)" {
-    arm: "ARM events\nStop · StopFailure\nNotification: permission_prompt\nelicitation_dialog"
-    disarm: "DISARM events\nUserPromptSubmit · PreToolUse\nSessionStart · SessionEnd"
+  hooks: "Plugin hooks → tap hook <Event>\n(hooks/hooks.json, per-session lock)" {
+    arm: "OPEN / RE-ARM\nStop (classified) · StopFailure\nPermissionRequest · elicitation_dialog\nPreToolUse: AskUserQuestion / ExitPlanMode"
+    disarm: "CLOSE\nUserPromptSubmit · SessionStart · SessionEnd\nPostToolUse of the bound call\nPreToolUse / PostToolUse (unbound)"
   }
   claude -> hooks.arm: "turn ends / waits"
   claude -> hooks.disarm: "user replies / work resumes"
 }
 
-core: "3 · Deterministic core (no model)" {
-  state: "Episode store\nplugin-data/sessions/<session_id>.json\n(episode_id, started_at, trigger, notified)" {shape: cylinder}
-  timer: "Detached sleeper\n(one per episode, exits fast hook)"
-  check: "Wake after grace (default 300 s):\nsame episode_id? still open?\nnot notified? background_tasks empty?" {shape: diamond}
-  drop: "Drop silently\n(stale / resumed)" {style.stroke-dash: 3}
-  timer -> check
-  check -> drop: "no"
-}
-
-classify: "4 · Classifier (local, embedded)" {
-  rules: "Event rules first\npermission → needs_permission\nStopFailure → blocked\nAskUserQuestion → needs_decision"
-  model: "Static-embedding model\n(model2vec potion + linear head)\nonly if rules undecided\ninput = last_assistant_message (untrusted)"
-  out: "Enum label + extractive summary\n(redacted, ≤80 chars)"
-  rules -> out: "decided"
-  rules -> model: "undecided"
+classify: "3 · Classifier (in the Stop hook, local)" {
+  model: "Embedded model (preview)\nmodel2vec potion-base-8M + linear head\ninput = last_assistant_message (untrusted)"
+  out: "Category + extractive summary\n(redacted, ≤80 chars)"
+  policy: "done / info with alert off\n→ closed as suppressed" {style.stroke-dash: 3}
   model -> out
+  out -> policy: "" {style.stroke-dash: 3}
 }
 
-policy: "5 · Notification policy" {
-  gate: "needs_* / blocked → notify\ndone → only if completion alerts on\ninfo → no alert" {shape: diamond}
+core: "4 · Sweeper (tap sweep, one per machine)" {
+  state: "Episode store\nplugin-data/state/<session_id>.json\n(episode id, status, category, due_at)" {shape: cylinder}
+  check: "Due (grace, default 300 s)?\nsame episode, still open?\nclaude still running?\npermission tool not running?" {shape: diamond}
+  drop: "Close or postpone\n(stale / gone / tool running)" {style.stroke-dash: 3}
+  claim: "Claim under lock:\nopen → sending"
+  state -> check: "re-read"
+  check -> drop: "no"
+  check -> claim: "yes"
 }
 
-notify: "6 · Delivery (v0.1)" {
-  ntfy: "Plugin connector: ntfy\n(user topic/server, redacted title+summary)\npluggable Notifier interface"
+notify: "5 · Delivery" {
+  ntfy: "ntfy (your topic/server)\nredacted title + summary\nnotified / failed / sent_uncertain"
   rc: "Built-in Remote Control push\n(user enables /rc + inputNeededNotifEnabled)\nindependent of plugin, immediate" {style.stroke-dash: 3}
-  later: "Later: desktop · Telegram · Slack" {style.stroke-dash: 3}
 }
 
 user: "You" {shape: person}
 
-session.hooks.arm -> core.state: "open episode (new episode_id)"
-session.hooks.arm -> core.timer: "spawn"
+session.hooks.arm -> classify.model: "Stop"
+classify.out -> core.state: "open episode"
+session.hooks.arm -> core.state: "open / bind / re-arm"
 session.hooks.disarm -> core.state: "close episode"
-core.state -> core.check: "re-read"
-core.check -> classify.rules: "yes"
-classify.out -> policy.gate
-policy.gate -> notify.ntfy: "send once, mark notified"
+core.claim -> notify.ntfy: "send at most once"
 notify.ntfy -> user
 notify.rc -> user: "" {style.stroke-dash: 3}
-user -> session.claude: "responds → DISARM"
+user -> session.claude: "responds → CLOSE"

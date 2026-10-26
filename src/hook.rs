@@ -585,7 +585,7 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
                 .as_ref()
                 .is_some_and(|b| b.iter().any(|t| t.status == "running"));
             let text = truncate_chars(input.last_assistant_message.as_deref().unwrap_or(""));
-            let mut c = classify(text);
+            let mut c = classify(text, cfg);
             if let Some(forced) = forced_category() {
                 c.category = forced;
             }
@@ -649,8 +649,10 @@ fn truncate_chars(s: &str) -> &str {
     }
 }
 
-fn classify(text: &str) -> Classification {
-    crate::classify::load().classify(text)
+/// Classify with the user's `classifier.mode` / `classifier.lean` (a project
+/// file cannot set these keys).
+fn classify(text: &str, cfg: &Config) -> Classification {
+    crate::classify::load_with(cfg.classifier_mode, cfg.classifier_lean).classify(text)
 }
 
 /// `TAP_TEST_FORCE_CATEGORY=<category>` (debug builds with `TAP_DEV=1` only).

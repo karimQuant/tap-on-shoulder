@@ -31,7 +31,7 @@ There are no daemons and no hosted parts. The system is one Rust binary (`tap`) 
 | `tap sweep` | A single on-demand process. Delivers due episodes at most once, then exits when nothing is left open |
 | Classifier | Event rules, then the embedded model ([model.md](model.md)). Output is a category plus an extractive summary |
 | Notifier | `trait Notifier`. v0.1 implements ntfy |
-| CLI | `tap setup`, `test`, `doctor`, `label` |
+| CLI | `tap setup`, `test`, `doctor`, `label`, `classify` (diagnostic: prints category, summary, and probabilities for stdin; writes nothing, sends nothing). The slash commands `/tap-on-shoulder:setup`, `/tap-on-shoulder:test`, and `/tap-on-shoulder:doctor` (`commands/*.md`) run these through `scripts/tap.sh` |
 
 ## Event mapping
 
@@ -49,9 +49,9 @@ Bound episodes are tied to a tool: one call (`tool_use_id`), a set of candidate 
 | `PostToolUse` / `PostToolUseFailure` | Remove the pending entry. **Close** a bound episode only if its id matches; for a candidate set, only once no candidate is still pending; for a tool name, only if the name matches. **Close** unbound episodes |
 | `PermissionDenied` | **Close** a bound episode only if `tool_name` is its tool (the bound call's pending entry, the candidates' name, or `bound_tool_name`). **Close** unbound episodes |
 | `ElicitationResult` | **Close** an `elicitation_dialog` episode |
-| `Stop` | Clear `pending_tools`. Classify `last_assistant_message`, then **open** an unbound episode with that category |
+| `Stop` | Clear `pending_tools` and **close** a bound episode. Classify `last_assistant_message` with the user's `classifier.mode` / `classifier.lean`, then **open** (or re-arm) an unbound episode with that category. A `done` or `info` result whose alert is off (`alerts.completion`, `alerts.info`) is closed at once as `suppressed` |
 | `Stop` with a `running` background task | Classify as above. `needs_decision` and `blocked` **open** as usual. `done` and `info` mean the session is still working: no episode (a new `Stop` arrives when the task finishes) |
-| `StopFailure` | **Open** `blocked` |
+| `StopFailure` | Clear `pending_tools`, **close** a bound episode, and **open** `blocked` (with the same `suppressed` rule as any arming) |
 | `SessionEnd` | **Close** the episode and delete the session's state |
 
 **Re-arm.** When an arming event arrives while an episode is already open, the episode keeps its `opened_at`. The category, summary, and binding are replaced only if the new event is bound or has a higher priority (`needs_permission` > `needs_decision` > `blocked` > `done` > `info`).
@@ -67,18 +67,19 @@ Bound episodes are tied to a tool: one call (`tool_use_id`), a set of candidate 
 - **Exclusivity.** `tap sweep` takes a non-blocking `flock` on `${CLAUDE_PLUGIN_DATA}/sweeper.lock`, so only one runs at a time. The lock lives outside `state/`, so no session id can collide with it. Any hook that leaves an open episode spawns it, and a duplicate exits immediately.
 - **Loop.** Scan every session file and sleep `min(earliest_due − now, 5 s)`.
 - **Shutdown.** When no episode is open, release the lock and **re-scan once**. Exit only if the second scan is also empty. This closes the race with a hook that opens an episode during shutdown.
+- **Policy is applied in the hook.** The `done` / `info` suppression happens at classification time in the hook (see `Stop` above), so the sweeper only ever sees episodes that may tap. At due time it re-checks liveness and delivery state:
 - **When an episode is due**, check in order:
   1. **Session gone?** The recorded `claude` process (pid plus start time) has exited or is a zombie → close as `session_gone`. Hooks detect `claude` once per session and store it; they detect again only when the stored process is gone. Every `ps` call runs with `LC_ALL=C TZ=UTC0`.
   2. **Permission tool running?** For `needs_permission`: a process descended from `claude` that started at or after `bound_at + 1 s` is alive in two samples taken 2 s apart → postpone 30 s, up to a total of 10 minutes. The extra second is the minimum time a human takes to approve, so a parallel tool started just before the prompt does not count.
-  3. **Policy.** `done` and `info` taps are sent only if enabled. Otherwise the episode is closed as `suppressed`.
-  4. **Claim.** Under the session lock, move `open` → `sending{attempt}`, only if the episode is still the same one and is still due (`now ≥ max(due_at, retry_at)`).
-  5. **Send**, then record the result:
+  3. **Claim.** Under the session lock, move `open` → `sending{attempt}`, only if the episode is still the same one and is still due (`now ≥ max(due_at, retry_at)`).
+  4. **Send**, then record the result:
 
      | Outcome | New state |
      |---|---|
      | Success | `notified` |
-     | Connect error | Back to `open`, retried with backoff (3 attempts) |
-     | Timeout after the request was written | `sent_uncertain` |
+     | Connect error (nothing sent) | Back to `open`, retried after 15 s then 30 s; `failed` (`unreachable`) after the 3rd attempt |
+     | HTTP error status | `failed` (`http_status`), not retried |
+     | Timeout or dropped connection after the request was written | `sent_uncertain`, not retried |
 
   The result is written only if the episode is still `sending` with the same attempt. A close that lands during the send always wins.
 - **Stale claims.** A `sending` state older than 2 minutes becomes `sent_uncertain`. Delivery is **at most once**: we would rather lose a tap than send it twice.
@@ -101,7 +102,7 @@ There is one file per session, with the `SessionState` schema from [contract.md]
 
 ## Security boundaries
 
-- **Untrusted input.** Hook stdin is untrusted. It is parsed with `serde` into typed structs and capped at 8 MiB. Messages are truncated to 16 KiB before classification.
+- **Untrusted input.** Hook stdin is untrusted. It is parsed with `serde` into typed structs and capped at 8 MiB. Messages are truncated to 16,384 characters before classification.
 - **No session text in commands.** Session text never reaches a command line, an environment variable, a file path, an HTTP header, or the log.
 - **Classifier output.** An enum, plus a summary that is copied (never generated), sanitized, and redacted.
 - **Network egress.** Only the configured ntfy server, as a JSON POST over HTTPS:
@@ -119,9 +120,9 @@ There is one file per session, with the `SessionState` schema from [contract.md]
 
 - **Log.** `${CLAUDE_PLUGIN_DATA}/log/tap.log`, written as JSON lines and capped at 1 MiB. Each line records the event, a short session ID, the episode ID, the transition, the category, and an error *kind*. Message text is never logged.
 - **`tap doctor`.** Reports:
-  - version and model variant
+  - version and model variant (with the *preview* note), the user's `classifier.mode` / `classifier.lean`, and the head's `lean_threshold`, `cv_tap_recall`, and `cv_macro_f1`
   - whether the config is valid, and which keys were ignored
-  - whether the ntfy server is reachable
+  - whether the ntfy server is reachable (exit 1 if not, or if there is no topic or the config is invalid)
   - open episodes and their due times
   - episodes in `failed` or `sent_uncertain`
   - training-data cap warnings
@@ -130,6 +131,6 @@ There is one file per session, with the `SessionState` schema from [contract.md]
 
 | Suite | What it covers | Where it runs |
 |---|---|---|
-| `tests/scenarios_core.rs` | One named test per acceptance scenario, plus race, corruption, stdout, and log-content tests. Uses a mock ntfy server and `TAP_GRACE_OVERRIDE=1s` | |
+| `tests/scenarios_core.rs` | One named test per acceptance scenario, plus race, corruption, stdout, and log-content tests. Uses a mock ntfy server and `TAP_DEV=1 TAP_GRACE_OVERRIDE=1s` | |
 | `tests/scenarios_classifier.rs`, `tests/parity.rs` | Rules fallback, prompt-injection cases, and parity with the Python pipeline (identical token ids and labels, probability difference < 1e-3) | |
 | `scripts/e2e.sh` | A real interactive `claude` in tmux with the plugin loaded: one tap, no duplicate, no tap after `claude -p` exits | Local only |

@@ -1,6 +1,6 @@
 # Contributing to tap-on-shoulder
 
-Thanks for your interest! The project is at the **design stage**, which is when feedback has the most impact.
+Thanks for your interest! The project is in **alpha**, which is when feedback has the most impact. Real-world testing helps most: run it in your sessions, report missed or unwanted taps, and, if you can, collect and label real endings locally with `training.collect = true` and `tap label`.
 
 ## Ways to help right now
 

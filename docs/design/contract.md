@@ -67,7 +67,7 @@ Evaluated on `tail` unless noted. All regexes are case-insensitive and use synta
 - **variant `features`:** `x = [f0..f11]`, so 12 dimensions. This is the fallback (option D).
 - **Head:** `logits = W·x + b`, with `W` of shape [4][dim]. Then `p = softmax(logits)`, computed in f32 with max-subtraction.
 - **Decision with `lean = alert`:** if `p[0] + p[1] ≥ lean_threshold`, choose whichever of 0 and 1 has the higher probability. Otherwise take `argmax(p)`. With `lean = balanced`, always take `argmax(p)`.
-- **`lean_threshold`** is read from `head.json`; the Rust runtime rejects a head without it. The shipped head uses **0.35**, the value `model/train.py` picks under the grouped-CV tap-recall gate in [model.md](model.md#release-bar). 0.25 is only the fallback that `model/train.py` uses when no threshold is passed, and the value in the example below and in test heads.
+- **`lean_threshold`** is read from `head.json`; the Rust runtime rejects a head without it. The shipped head uses **0.35**, the value `model/train.py` picks under the grouped-CV tap-recall gate in [model.md](model.md#preview-gate-synthetic-v01). 0.25 is only the fallback that `model/train.py` uses when no threshold is passed, and the value in the example below and in test heads.
 
 `assets/head.json`:
 ```json
@@ -142,9 +142,17 @@ The state schema is `SessionState` in `src/contract.rs` (`STATE_VERSION = 1`). I
 
 - `pending_tools[{tool_use_id, tool_name, input_hash}]`
 - `claude{pid, start}`
-- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason}`
+- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, candidate_ids, bound_tool_name, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason}`
 
 **Write guard:** the sweeper writes `notified`, `failed`, or `sent_uncertain` only if the episode still has the same `id` and is still `sending` with the same `attempts`. A hook that closes the episode while a send is in flight always wins.
+
+**Tool binding.** A bound episode (a decision tool's `PreToolUse`, or a `PermissionRequest`) records which tool call it waits on in exactly one of three fields; the other two are empty:
+
+- **`tool_use_id`:** the one pending call it waits on. For a `PermissionRequest`, this is the pending call with the same tool name and input hash, or else the only pending call with that tool name. `PostToolUse` / `PostToolUseFailure` of that id closes the episode.
+- **`candidate_ids`:** set when several pending calls of the requested tool match by name but none by input hash, so any of them may be the one behind the prompt. Sorted. The episode closes on a `PostToolUse` / `PostToolUseFailure` once none of these ids is still pending.
+- **`bound_tool_name`:** set when no pending call of the requested tool is known (fallback binding by name). A `PostToolUse` / `PostToolUseFailure` of a tool with this name closes the episode.
+
+A re-arm whose binding differs from the current one is a new prompt: `opened_at` restarts. `PermissionDenied` closes a bound episode only if the denied tool is the one it waits on.
 
 **`bound_at`:** the time of the most recent binding to a tool. The permission running-tool check (plan R4) counts only processes started after `bound_at`.
 
