@@ -1,0 +1,8 @@
+# Training pipeline only (never needed at runtime). Exact pins for reproducible heads.
+numpy==2.5.4
+scikit-learn==1.9.1
+tokenizers==0.23.3
+# scikit-learn runtime dependencies, pinned for reproducibility
+scipy==1.18.1
+joblib==1.6.0
+threadpoolctl==3.7.0

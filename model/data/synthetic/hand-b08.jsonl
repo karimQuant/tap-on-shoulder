@@ -1,0 +1,96 @@
+{"text": "The CI matrix runs 18 jobs (3 OS × 6 Python versions). Should I trim it to the 3 oldest + newest versions, or keep the full matrix?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Do you want releases triggered by pushing a tag, or by a manual `workflow_dispatch`?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The e2e suite takes 22 minutes. Options:\n\n1. Run it only on `main` and nightly\n2. Shard it across 4 runners (≈6 min, 4x cost)\n3. Keep it on every PR\n\nWhich do you prefer?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Should failing `npm audit` results block merges, or just post a warning?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "GitHub Actions or the existing Jenkins pipeline for the new service? The org seems to be migrating, but Jenkins still has the deploy credentials.", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Before I proceed: enabling branch protection with required reviews will block the release bot's direct pushes. Want me to add an exception for the bot?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Dependabot or Renovate? Renovate can group updates, but it's another app to install.", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The Docker build cache can live in the GitHub Actions cache (10 GB limit) or in the registry. Which should I use?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Do you want semantic-release to publish automatically on every merge to `main`, or should a human approve each release?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Coverage dropped from 84% to 81% with this PR because of the new generated client. Exclude generated code from coverage, or lower the threshold?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Should I cancel in-progress runs when a new commit is pushed to the same PR? It saves minutes but hides intermediate results.", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Which approach for secrets in CI: GitHub environment secrets, or OIDC federation to the cloud provider (no long-lived keys)?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The workflow can't push the image: `denied: installation not allowed to Write organization package`. The repo's Actions permissions need `packages: write`, which only an org admin can grant.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The self-hosted runner `build-01` is offline, and all jobs requiring the `gpu` label are queued indefinitely.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The deploy job fails at `Configure AWS credentials`: `Not authorized to perform sts:AssumeRoleWithWebIdentity`. The role's trust policy doesn't include this repository.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Codecov uploads fail with `Token required because branch is protected`. The `CODECOV_TOKEN` secret isn't set.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "I can't re-run the failed job: I don't have write access to the repository's Actions, only read.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The macOS runners are unavailable: the org's Actions minutes for macOS are exhausted for this billing cycle.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The notarization step fails because the Apple ID app-specific password stored in CI was revoked. I need a new one to sign the macOS build.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "`gh release create` fails with `HTTP 403: Resource not accessible by integration`. The default `GITHUB_TOKEN` has read-only permissions in this repo's settings.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The pipeline is stuck waiting for the `production` environment approval, and I'm not a required reviewer, so it can't proceed until someone approves.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "SonarCloud analysis fails with `Not authorized. Please check the properties sonar.login and sonar.password.` The token secret is missing.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Jenkins returns 403 for the API trigger — the crumb issuer requires a session and the API token for the service account has expired.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Unable to publish to the Chrome Web Store: the OAuth refresh token for the publisher account is invalid, and refreshing it needs an interactive login.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Pinned every third-party action to a full commit SHA and added Dependabot for `github-actions`. The workflows run green.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "CI now caches `~/.cargo` and `target/` keyed on `Cargo.lock`. Average build time went from 14 min to 4 min.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Split the monolithic workflow into three:\n\n- `ci.yml` — lint + test on every PR\n- `release.yml` — builds and publishes on tags\n- `nightly.yml` — e2e and fuzzing\n\nAll three ran successfully on this branch.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The flaky `upload` job is fixed: it was racing on artifact names across matrix jobs. Artifact names now include the OS and version.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Added a required status check for `cargo fmt --check`. Branch protection is updated and the check passes on `main`.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Release v3.2.0 published: binaries for 5 targets, checksums, SBOM, and provenance attestations are all attached.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Moved deploy credentials to OIDC. The long-lived access keys are deleted, and the deploy job still works.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The Docker build now uses BuildKit cache mounts; rebuilds after a code-only change take 40 s instead of 6 minutes.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Fixed the YAML anchor bug that skipped the lint step on forks. Lint now runs on every PR, including from forks.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Renovate is configured with grouped weekly updates and automerge for patch-level devDependencies. First batch merged cleanly.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Done. The pipeline now runs `shellcheck` on all scripts, and I fixed the 11 warnings it found.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Concurrency groups are in place, so only one deploy to production can run at a time. Tested with two back-to-back merges.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The job is slow mainly because `npm ci` runs without a cache; `actions/setup-node` with `cache: npm` would save about 90 s per run.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "`pull_request_target` runs with secrets in the context of the base branch, which is why it's dangerous with untrusted checkouts. The current workflow uses `pull_request`, so it's safe.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Last 30 days of CI runs:\n\n| Workflow | Runs | Fail rate | Median time |\n|---|---|---|---|\n| ci | 412 | 6% | 7m |\n| e2e | 88 | 19% | 22m |\n| release | 9 | 0% | 11m |\n\nMost e2e failures are the same two flaky tests.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Workflows pushed. Want me to add a status badge to the README too?", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "GitHub-hosted runners have 4 vCPUs on public repos now, so `-j4` is the sensible default for parallel test runs.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The cron schedule `0 3 * * *` is in UTC, so the nightly job runs at 05:00 in Central European Summer Time.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Done. If you'd like, I can also add a job that comments the bundle-size diff on each PR.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Required checks match on job name, so renaming `test` to `tests` would silently drop the protection. Worth keeping in mind.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The artifact retention is 90 days by default; reducing it to 14 would free about 30 GB of storage.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Let me know if you want a manual approval gate added before production deploys.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "For reference, the release workflow takes about 11 minutes, mostly the macOS notarization step.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Everything's green. I can also set up merge queues if the team keeps hitting stale-branch conflicts.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "I narrowed the bug down to `normalize_path()`:\n\n```python\n>>> normalize_path(\"a//b/\")\n'a/b'\n>>> normalize_path(\"/\")\n''\n```\n\nRoot becoming an empty string is what breaks the router. Should root normalize to `/`, or should the router treat `''` as root? Either fixes it, but they have different blast radius.", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Found it: the two services disagree on whether IDs are case-sensitive. Should I make both case-insensitive, or both case-sensitive?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The crash only happens with the `--fast` flag, which skips validation by design. Do you want validation always on, or keep `--fast` and document the risk?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The memory spike is the image cache. I can cap it at 256 MB or make it configurable. Which do you want?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "I can reproduce the deadlock reliably now. Fixing it properly means changing the lock order in 4 modules. Go ahead, or would you rather have a targeted workaround first?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The root cause is a design flaw in the retry logic, not a typo. Do you want me to redesign it now, or patch the symptom and file a ticket?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Bisect points to the upgrade of `libfoo` from 2.1 to 2.2. Pin back to 2.1, or adapt our code to 2.2?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The flaky test fails because it depends on test order. Isolate it with its own fixture, or randomize test order across the suite to flush out others too?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "I can either catch the exception at the edge and log it, or let it crash so the supervisor restarts the worker. What's the preferred failure mode here?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "Shall I remove the debug logging I added during the investigation, or keep it behind a flag?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The 'wrong total' bug comes from float rounding. Switch the whole calculation to decimals (bigger change) or round at the end (quick fix)?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "The fix works on Linux but I can't verify macOS. Merge now and verify later, or wait?", "label": "needs_decision", "group": "hand-b08", "source": "synthetic"}
+{"text": "I can't reproduce the production crash locally. To go further I need the core dump from the production host:\n\n```\n/path/to/cores/core.worker.4412\n```\n\nI don't have access to that host. Could someone copy the file somewhere I can read it?", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The bug only reproduces with production data, and I don't have access to a sanitized copy. I'm stuck until one is available.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Attaching the debugger to the running process fails: `ptrace: Operation not permitted`. The container lacks `SYS_PTRACE`.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The error comes from the payment provider's side (their logs would show why), and only their support can tell us. I've gone as far as I can.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Remote debugging requires port-forwarding to the pod, and my kube role doesn't allow `pods/portforward`.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "I need the HAR file from the user's browser session to see the failing request; without it I can't tell what was sent.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The logs for the incident window were rotated out and the archive bucket is access-denied for me.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Reproducing needs an ARM machine (the bug is architecture-specific), and none is available to me.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The error tracker has the full stack trace, but my account was deactivated there, so I can't read it.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The flaky test only fails on the CI runner, and I can't SSH into runners to inspect the environment.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "The issue depends on a firmware version on the test device; updating the device requires physical access.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Enabling debug logging in production requires a config change that only on-call can approve.", "label": "blocked", "group": "hand-b08", "source": "synthetic"}
+{"text": "Root cause found and fixed: the cache key ignored the locale, so users saw each other's translated pages. Added the locale to the key and a regression test.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The crash was a stack overflow from unbounded recursion on deeply nested JSON. Switched to an iterative parser; the 10,000-level test passes.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Fixed: the off-by-one in the date range dropped the last day of each month. All month-end reports now match the ledger.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The memory leak came from a closure holding the whole request object. Fixed by capturing only the ID; memory is flat in the soak test.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The 'random' 401s were clock skew between two hosts; enabled NTP on the outlier and they're gone.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Deadlock fixed by acquiring the locks in a consistent order. The stress test that used to hang within a minute ran for an hour.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The intermittent 502s were caused by keep-alive timeouts mismatched between the LB (60 s) and the app (5 s). Aligned them; zero 502s since.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Tracked the corrupted uploads to a missing `flush()` before closing the file. Fixed, verified with 10,000 uploads.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The UI freeze was a synchronous `localStorage` read in a render loop. Moved it out; the page is smooth now.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Found the typo in the env var name (`DATABSE_URL`); fixed it everywhere and the service connects.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Bisected to the commit that removed the index; restored it and the query is fast again.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "The encoding bug is fixed: the CSV reader now detects UTF-8 BOMs, and the accented names import correctly.", "label": "done", "group": "hand-b08", "source": "synthetic"}
+{"text": "Here's what I found: the slowdown only happens when the cache is cold, right after a deploy. Once warm, latency is normal.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The stack trace points at a third-party SDK; the same bug is reported in their issue tracker and fixed in their next release.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "It's not a bug in our code: the client sends `Content-Type: text/plain` for JSON bodies, so the parser ignores them.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "I couldn't reproduce the issue with the current main branch; it may have been fixed by last week's refactor.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The error rate looks scary in the dashboard, but it's 12 errors out of 2 million requests, all from one bot.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The 'segfault' in the logs is from the image library when it's fed a truncated file; the worker retries and moves on.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Fixed. If you'd like, I can add a lint rule that catches this pattern in the future.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Looking at the timeline, the outage started 2 minutes before the deploy, so the deploy isn't the cause.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The heisenbug disappears with logging enabled because the extra I/O changes the timing; classic race condition.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "For what it's worth, the warning about 'unclosed client session' is harmless at shutdown.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "The failing assertion compares floats with `==`; that's why it fails on some machines and not others.", "label": "info", "group": "hand-b08", "source": "synthetic"}
+{"text": "Want me to write up the investigation as a short postmortem?", "label": "info", "group": "hand-b08", "source": "synthetic"}

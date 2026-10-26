@@ -1,0 +1,96 @@
+{"text": "The iOS app can target iOS 16+ (drops ~4% of users) and gain SwiftUI navigation stacks, or keep iOS 15 support. What's the priority here?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Swift Concurrency or Combine for the new networking layer? I lean toward async/await, but the existing view models use Combine everywhere.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The Android min SDK is 21. Raising it to 24 removes the multidex workaround. OK with that?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "I can rotate the leaked test token now, which will break the two QA devices until they're reconfigured, or wait until tonight. Let me know which.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The CSP blocks the analytics script. Add the analytics domain to `script-src`, or self-host the script?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Kotlin Multiplatform for the shared logic, or keep separate Swift and Kotlin implementations? This shapes the next three months of work, so I'd rather you pick.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "For password reset, magic link or 6-digit code? The code is friendlier on mobile; the link is what we have on web.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Do we store the refresh token in the Keychain with `afterFirstUnlock` or `whenUnlocked`? The former allows background refresh, the latter is stricter.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Flutter's `go_router` or the built-in Navigator 2.0 for deep links? I need a decision before I restructure the routes.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The SAST tool flags 31 findings, 28 of them in test code. Suppress those 28 in config, or fix them anyway?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Which crash reporter should the new app use — the one the web team uses, or the platform-native one? I don't want to set up both.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Is it acceptable to log the user ID (not the email) in crash reports? I need a clear yes or no for the privacy review.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The App Store Connect API key has been revoked, so TestFlight uploads fail with 401.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The Android release build needs the upload keystore, and it's not in this environment (it's kept offline, per the README).", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The emulator won't boot: hardware acceleration (KVM) isn't available in this VM.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "I'm waiting on the security team: the pen-test environment requires an allowlisted IP, and this machine's request hasn't been approved yet.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Xcode Cloud is failing at the very first step with a provisioning profile error, and only an account holder can regenerate profiles.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The Firebase project for staging was deleted, so `google-services.json` points at nothing and the app crashes on launch. Someone needs to recreate the project or give me the new config.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Push notifications can't be tested: the APNs auth key isn't uploaded, and I have no access to the Apple developer account.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Gradle sync hangs on downloading `com.android.tools.build:gradle` — the corporate proxy requires authentication that isn't configured.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "I can't scan the container images: the vulnerability scanner's database update fails because the feed URL is blocked by the firewall.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The secret scanning alert can't be resolved from my side — the leaked credential belongs to a third-party account only the owner can revoke.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Detox tests time out waiting for the app; the simulator runtime for iOS 18 isn't installed, and downloading it needs an Apple ID sign-in.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The HSM that holds the code-signing key is offline for maintenance, so nothing can be signed today.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The login screen now supports Face ID and Touch ID, with a passcode fallback. Tested on three simulators and one physical device.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Rotated the exposed test token and updated the QA devices. The old token returns 401 now.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Added certificate pinning for the API host with a backup pin. Requests to a proxied host now fail as expected.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The Android app bundle is 23% smaller after enabling R8 full mode and removing unused resources.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Every dependency with a known CVE has been upgraded; the SCA report is clean.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Deep links for `/orders/:id` work on both platforms, including cold start. Covered by new UI tests.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The CSP now uses nonces instead of `unsafe-inline`, and the report-only run over 48 hours showed zero violations, so it's enforced.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Offline mode is implemented: reads come from the local SQLite cache and writes are queued and replayed on reconnect.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The app passes the accessibility scanner on Android with no issues, and VoiceOver labels are set on every control.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Shipped 2.8.0 to both stores; the phased rollout is at 10% and crash-free sessions are at 99.8%.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Session cookies are now `Secure`, `HttpOnly`, and `SameSite=Lax`. Verified in the browser and in the security headers test.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The jailbreak/root detection is wired in and reports to telemetry without blocking users, as agreed.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Battery drain comes from the location updates running at `kCLLocationAccuracyBest` in the background; reducing accuracy would help a lot.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Implemented. I could also add a biometric re-prompt for payments, if you'd like stricter protection there.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The 'insecure HTTP' warning is from the local dev server only; production traffic is HTTPS end to end.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Android 14 requires a foreground service type for the sync service; ours declares `dataSync`, so we're compliant.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Crash summary for the last 7 days:\n\n| Crash | Users | Platform |\n|---|---|---|\n| NPE in `CartAdapter` | 412 | Android |\n| `EXC_BAD_ACCESS` in image cache | 128 | iOS |\n| OOM on image upload | 57 | Android |\n\nThe top one is already fixed in 2.8.1, which is in review.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "bcrypt with cost 12 takes about 250 ms on our servers, which is a reasonable trade-off for login latency.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The fix is in. If useful, I can write up a short postmortem for the token leak.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "SameSite=Strict would break the OAuth redirect flow, which is why Lax is the usual choice for session cookies.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "React Native's new architecture is enabled by default since 0.76; our native modules are already compatible.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The app review rejection was about the missing account-deletion flow, which we already shipped in 2.7; replying with a screen recording should be enough.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "All good. Let me know if you'd like me to enable Play Integrity checks as well.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The threat model doc is in `docs/security/threat-model.md`; the two highest risks are token theft on rooted devices and the unauthenticated webhook.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The eval set overlaps 4% with the training data. Dedupe and retrain (6 hours), or report the numbers with a caveat?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Fine-tune the small model on our data, or use the larger model zero-shot? Accuracy is similar; the large one costs 8x per request.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Should the feature store be the source of truth for training features, or do we keep computing them in the training job?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Spot instances would cut training cost by ~65% but runs may be interrupted. OK to switch, with checkpointing every 15 minutes?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Which metric should gate model promotion: AUC or precision at 90% recall?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Store the embeddings in pgvector or a dedicated vector DB? pgvector keeps infra simple; the dedicated one scales further.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Do you want the batch predictions written back to the warehouse or published as files to the bucket?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Retrain weekly on a schedule, or only when drift is detected?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Lambda or Fargate for the inference endpoint? Cold starts on Lambda add ~2 s for this model size.", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The labeled data has 3% obviously wrong labels. Fix them by hand (half a day) or train with label smoothing and move on?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Should the cloud resources be tagged per team or per project for cost allocation?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "Region choice for the new bucket: closest to users (eu-central) or co-located with compute (us-east)?", "label": "needs_decision", "group": "hand-b10", "source": "synthetic"}
+{"text": "The training job can't start: the GPU quota for this project is 0 in every region, and raising it needs a support ticket from the account owner.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "I can't read the feature tables: the service account lacks `bigquery.tables.getData` on the `features` dataset.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The model registry rejects uploads with `401`: the MLflow tracking token is expired.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Downloading the base checkpoint fails with 403; the model is gated and needs an accepted license on your account.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The labeling tool's export API requires an admin token; my token only has annotator rights.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The Spark cluster is terminated and recreating it needs workspace admin permissions I don't have.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Can't deploy the endpoint: the VPC has no free IP addresses in the private subnets.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The CloudFormation stack is in `UPDATE_ROLLBACK_FAILED`; continuing the rollback needs permissions on resources outside my role.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Azure login fails with `AADSTS50076`: multi-factor authentication is required, which I can't complete.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The notebook server is out of disk and I can't resize the volume from my account.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "The vendor API we use for OCR is returning 402 Payment Required; the subscription has lapsed.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Experiment tracking is down (the hosted service is having an outage), and the training script refuses to run without it.", "label": "blocked", "group": "hand-b10", "source": "synthetic"}
+{"text": "Retrained on the deduplicated data: test F1 is 0.87 (was 0.89 with leakage). Model card and metrics are published.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The inference service is live behind the API gateway: p50 45 ms, p99 120 ms at 200 RPS in the load test.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Set up drift monitoring: daily PSI per feature, alerting above 0.2. The first report ran successfully.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Moved training to spot instances with checkpointing. The last three runs completed, one after an interruption, at 62% lower cost.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Converted the model to ONNX; outputs match PyTorch within 1e-5 and inference is 3x faster on CPU.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Batch scoring for all 4.2M customers finished and the results are in the warehouse table.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Added cost-allocation tags to all 214 resources via Terraform; the cost explorer breaks down by team now.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "S3 lifecycle rules are applied: objects move to infrequent access after 30 days and are deleted after a year.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The embedding pipeline is rebuilt with batching; reindexing all documents took 18 minutes instead of 3 hours.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Wrote the model card and the data sheet; both are in the repo and linked from the registry entry.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "Hyperparameter search finished (60 trials); the best config is checked in and the model is promoted to staging.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "IAM cleanup done: removed 31 unused roles and narrowed 4 wildcard policies. Nothing broke in the last 24 hours.", "label": "done", "group": "hand-b10", "source": "synthetic"}
+{"text": "The model underperforms on short texts because only 6% of the training examples are under 20 words.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The validation loss plateaus after epoch 3, so the remaining 7 epochs are mostly overfitting.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Inference cost is dominated by the tokenizer, not the model: 60% of the CPU time is spent tokenizing.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Trained and registered. Want me to set up an A/B test against the current model?", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Egress is the biggest line item on the cloud bill this month, mostly from serving model files to the CI runners.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The class imbalance is 1:40, so accuracy is misleading here; precision-recall is the metric to watch.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "If you'd like, I can compare a few smaller models to see if we can cut latency without losing accuracy.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Reserved instances would save about 30% on the always-on inference nodes, based on the last 3 months of usage.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The SHAP values show the model leans heavily on `account_age`, which might be a proxy for something else.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "The gap between offline and online metrics is expected: the offline set doesn't include new users.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Done. Happy to write a short explainer for the stakeholders on what the new model changes.", "label": "info", "group": "hand-b10", "source": "synthetic"}
+{"text": "Cloud Run scales to zero by default, which is why the first request after idle is slow.", "label": "info", "group": "hand-b10", "source": "synthetic"}

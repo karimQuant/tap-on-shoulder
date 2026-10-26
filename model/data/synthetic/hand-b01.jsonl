@@ -1,0 +1,96 @@
+{"text": "Should I squash these into one commit or keep them separate?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Two ways forward: patch the regex or swap in a real parser. Which do you prefer?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Keep the old endpoint as a deprecated alias, or remove it outright?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Do you want the retry limit at 3 or 5?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Before I proceed: is it OK to drop the `legacy_sessions` table?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Tabs or spaces for the new Makefile targets? The repo mixes both.", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "I can bump React to 19 now or wait for the router upgrade. Your call.", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Is `main` the right base branch, or should this go on `release/2.x`?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Which one should be the source of truth for the version, `Cargo.toml` or the git tag?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Want it as a cron job or a systemd timer? Both work on that host.", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Please confirm the target region: us-east-1 or eu-west-1?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Merge now, or wait for the second reviewer?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "I can't push: the remote rejected the credentials.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Blocked on `npm install`. The registry returns 401 for the private scope.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "The `DATABASE_URL` env var isn't set, so the migration can't run. Please set it and re-run.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Docker daemon isn't running, so I can't build the image.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "I need your API key for the staging billing sandbox to continue.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Permission denied writing to `/var/lib/app`. I need you to run this with sudo or change the owner.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "The test database is unreachable (connection refused on port 5432). Nothing else I can do until it's up.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "`kubectl` has no context configured on this machine, so I can't reach the cluster.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Stuck: the upstream API is rate limiting us (429) and the reset window is an hour.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "The GPG signing key isn't available in this shell, so the release tag can't be signed.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Can't continue. The VPN seems to be down and the internal package mirror times out.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "The license server rejects the build agent; someone with admin access has to re-register it.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Done. All tests pass.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Fixed the off-by-one in `paginate()`; the failing test is green now.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Merged into `main` and deleted the branch.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Renamed `getUser` to `fetchUser` across 14 files. Build is clean.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "The migration ran successfully on staging.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "✅ Lint, typecheck, and unit tests all pass.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Bumped the base image to `debian:bookworm-slim` and rebuilt. Image is 38 MB smaller.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Removed the dead feature flag and its three call sites.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Pinned all GitHub Actions to commit SHAs.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Release v1.4.2 is tagged and the changelog is updated.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Added the missing index; the query now takes 12 ms instead of 900 ms.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "That's finished: the CSV export now streams instead of buffering.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Done. Want me to also add a test for the empty case?", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "The flaky test is timing-dependent: it assumes the cache warms within 50 ms.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "`Rc` is enough here because nothing crosses a thread boundary.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Happy to also wire this into CI if you'd like.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "That warning comes from a transitive dependency and is harmless.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Let me know if you want the same change in the admin app.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "For context: the 502s line up with the nightly backup window.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "The bundle grew by 40 KB, mostly from the date library.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Pushed. If you'd like, I can open the PR as a draft too.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "No changes needed; the config already does what you described.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Short answer: `useMemo` won't help, the expensive part is the network call.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Tests pass. I can also clean up the unused imports if you want me to.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Tenho duas abordagens para o cache: Redis ou memória local. Qual você prefere?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Est-ce que je garde la compatibilité avec l'ancien format de configuration, ou est-ce qu'on la supprime dans cette version ?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "¿Quieres que los tests de integración usen una base de datos real o un mock?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Sollen wir die Migration heute Abend ausführen oder bis zum Wartungsfenster am Samstag warten?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "这个接口应该返回 404 还是空数组？请确认一下。", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "本番環境にデプロイしてもよろしいですか？それともステージングで一日様子を見ますか？", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Devo remover as rotas antigas agora ou manter por mais uma versão?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Je peux corriger le bug rapidement avec un contournement, ou refaire proprement le module. Que préférez-vous ?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Brauchst du die alten Logs noch, oder darf ich sie löschen?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "¿Lo dejo en una sola rama o prefieres dos PR separados?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Vuoi che usi TypeScript anche per gli script di build, o restiamo in JavaScript?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Moet de nieuwe service in dezelfde repository komen, of in een aparte?", "label": "needs_decision", "group": "hand-b01", "source": "synthetic"}
+{"text": "Não consigo continuar: o token do registro privado expirou e o `npm install` falha com 401.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Impossible de pousser la branche : `Permission denied (publickey)`. Il faut ajouter ma clé SSH au dépôt.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "No tengo acceso al bucket de producción (`AccessDenied`), así que no puedo descargar los datos.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Der Docker-Daemon läuft nicht, und ich habe keine Rechte, ihn zu starten. Ohne ihn kann ich die Tests nicht ausführen.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "缺少数据库密码，迁移脚本无法运行。请提供凭据。", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "APIキーが設定されていないため、外部サービスに接続できません。", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "A VPN caiu e o servidor de pacotes interno não responde. Estou bloqueado até ela voltar.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Le certificat TLS du serveur de test a expiré, toutes les requêtes échouent. Je ne peux pas le renouveler moi-même.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "La cuota de la API se agotó (429) y no se reinicia hasta mañana.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Ohne Zugriff auf den Cluster (Forbidden) kann ich das Deployment nicht prüfen.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Non riesco a proseguire: il server di CI è offline da stamattina.", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Ik kan niet verder: de testdatabase is onbereikbaar (connection refused).", "label": "blocked", "group": "hand-b01", "source": "synthetic"}
+{"text": "Pronto! A migração terminou e todos os testes passaram.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "C'est fait : le pipeline CI tourne en 4 minutes au lieu de 12, et tout est vert.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Listo: el formulario ya valida los campos y los mensajes de error se muestran correctamente.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Fertig: Die Abhängigkeiten sind aktualisiert und alle 240 Tests laufen durch.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "已完成：内存泄漏已修复，压力测试运行一小时没有问题。", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "リファクタリングが完了し、すべてのテストが通りました。", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Corrigi o bug de fuso horário e adicionei um teste de regressão. Já está no `main`.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "J'ai fusionné la branche et supprimé l'ancienne configuration. ✅", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "He desplegado la versión 2.3 en producción y los paneles se ven normales.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Der Fehler beim Datei-Upload ist behoben und bereits ausgerollt.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Fatto: la build ora passa su tutte e tre le piattaforme.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Klaar: de cache werkt en de pagina laadt nu in 300 ms.", "label": "done", "group": "hand-b01", "source": "synthetic"}
+{"text": "Para contexto: o aviso vem de uma dependência antiga e não afeta o funcionamento.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Si tu veux, je peux aussi ajouter un test pour le cas où la liste est vide.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "El cuello de botella está en la consulta a la base de datos, no en el frontend.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Die Verzögerung kommt vom DNS-Lookup beim ersten Aufruf; danach ist alles gecacht.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "如果需要，我也可以帮你写一份部署文档。", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "このワーニングは開発環境でのみ表示され、本番には影響しません。", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Se quiser, posso também atualizar o README com as novas instruções.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Pour info : la taille du bundle a augmenté de 30 Ko à cause de la nouvelle bibliothèque de graphiques.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Si lo necesitas, puedo preparar un resumen de los cambios para el equipo.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Kurz erklärt: `git fetch` lädt nur herunter, `git pull` führt zusätzlich einen Merge aus.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Se vuoi, posso anche aggiungere un controllo di lint in CI.", "label": "info", "group": "hand-b01", "source": "synthetic"}
+{"text": "Ter info: de fout komt alleen voor in Safari, door een bekende bug in de browser.", "label": "info", "group": "hand-b01", "source": "synthetic"}
