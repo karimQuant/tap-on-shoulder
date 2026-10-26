@@ -35,7 +35,7 @@ pub fn test_tap() -> i32 {
         Ok(n) => n,
         Err(e) => {
             eprintln!(
-                "cannot send: {} (run `tap setup` or fix the config)",
+                "cannot send: {} (run /tap-on-shoulder:setup or fix the config)",
                 e.kind()
             );
             return 1;

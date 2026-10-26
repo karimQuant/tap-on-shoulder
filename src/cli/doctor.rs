@@ -40,7 +40,7 @@ pub fn run() -> i32 {
     let ntfy = &c.ntfy;
     match &ntfy.topic {
         None => {
-            println!("ntfy: no ntfy topic configured (run `tap setup`)");
+            println!("ntfy: no ntfy topic configured (run /tap-on-shoulder:setup)");
             fail = true;
         }
         Some(_) => println!("ntfy: server {} (topic set)", ntfy.server),

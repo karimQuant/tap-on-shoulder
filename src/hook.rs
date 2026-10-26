@@ -22,7 +22,7 @@ use crate::state::{self, Loaded, Store};
 const PRUNE_AFTER: Duration = Duration::from_secs(24 * 3600);
 
 pub const NO_TOPIC_WARNING: &str =
-    "tap-on-shoulder: no ntfy topic configured, so no taps will be sent. Run `tap setup`.";
+    "tap-on-shoulder: no ntfy topic configured, so no taps will be sent. Run /tap-on-shoulder:setup.";
 
 /// Events we understand, as static strings for the log.
 fn event_name(name: &str) -> Option<&'static str> {

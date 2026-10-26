@@ -225,6 +225,6 @@ if [ -n "$DATA" ] && [ ! -d "$LOCK" ]; then
   fi
 fi
 if [ "$event" = "SessionStart" ]; then
-  printf '%s\n' '{"systemMessage":"tap-on-shoulder: installing its binary in the background; taps start once it finishes (run tap doctor)."}'
+  printf '%s\n' '{"systemMessage":"tap-on-shoulder: installing its binary in the background; taps start once it finishes (check with /tap-on-shoulder:doctor)."}'
 fi
 exit 0

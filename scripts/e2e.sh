@@ -187,7 +187,11 @@ while [ "$i" -lt 180 ]; do  # up to 90 s: first start can install updates
   i=$((i + 1))
   sleep 0.5
 done
-[ "$ready" -eq 1 ] || fail "claude did not reach the prompt (trust handled: $trusted)"
+if [ "$ready" -ne 1 ]; then
+  printf 'e2e: last screen:\n' >&2
+  pane | grep -v '^[[:space:]]*$' | tail -15 >&2
+  fail "claude did not reach the prompt (trust handled: $trusted)"
+fi
 sleep 2
 
 tmux -L "$SOCK" send-keys -t "$SESSION" -l \
