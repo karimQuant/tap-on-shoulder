@@ -1,1 +1,37 @@
+# Local agent / planning state (never commit)
 .omc/
+.claude/settings.local.json
+
+# Rust
+/target/
+**/*.rs.bk
+
+# Secrets and local config — never commit
+.env
+.env.*
+*.pem
+*.key
+*.p12
+config.local.toml
+
+# Training data collected during testing stays on the machine that produced it.
+# Only synthetic, reviewed datasets under model/data/synthetic/ are committed.
+model/data/collected/
+model/data/raw/
+*.jsonl
+!model/data/synthetic/*.jsonl
+
+# Model artifacts are published as release assets, not committed
+model/artifacts/
+*.safetensors
+*.onnx
+
+# Python (training tooling)
+__pycache__/
+.venv/
+*.pyc
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
