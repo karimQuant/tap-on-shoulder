@@ -27,7 +27,7 @@ The order is fixed. It is also the head's output order.
 3. **Strip accents, then lowercase.** This is HF's order. Apply NFD, drop category `Mn`, then lowercase. (The tokenizer has `strip_accents: null` with `lowercase: true`, which means accents are stripped.)
 4. **Pre-tokenize.** Split on whitespace. Then split each piece around every punctuation character, keeping the punctuation as its own token. Punctuation is ASCII 33–47, 58–64, 91–96, 123–126, plus any Unicode category `P*`.
 5. **WordPiece.** A word longer than 100 characters becomes `[UNK]`. Otherwise, match greedily from left to right, taking the longest match each time, with continuation pieces prefixed `##`. If any piece fails to match, the whole word becomes `[UNK]`.
-6. **Ids.** Drop special ids (`[PAD]` 0, `[UNK]` 100, `[CLS]` 101, `[SEP]` 102, `[MASK]` 103). Keep the **first 512** ids.
+6. **Ids.** Drop the tokenizer's special `added_tokens`. In potion-base-8M these are `[PAD]` 0, `[UNK]` 1, `[CLS]` 2, `[SEP]` 3, `[MASK]` 4. (IDs 100–103 are ordinary wordpieces in this vocab.) Keep the **first 512** ids.
 
 The ground truth is the HF `tokenizers` library loading the same `tokenizer.json` with `add_special_tokens=False`, followed by step 6.
 
@@ -38,7 +38,7 @@ The ground truth is the HF `tokenizers` library loading the same `tokenizer.json
   - `scale_r = max(|row_r|) / 127` (f32). If `max` is 0, then `scale_r = 1`.
   - `q = clamp(round_half_away_from_zero(x / scale_r), -127, 127)`.
   - Dequantize as `q * scale_r`.
-- **Sentence vector:** the mean of the dequantized rows over the ids, then L2-normalized. No ids, or a zero norm, gives the zero vector.
+- **Sentence vector:** add the dequantized rows sequentially in f32, in id order. Divide by n, then L2-normalize. If there are no ids, or the norm is zero, the result is the zero vector.
 
 ## Hand features (`feature_spec = 1`)
 
@@ -46,13 +46,13 @@ Evaluated on `tail` unless noted. All regexes are case-insensitive and use synta
 
 | # | Name | Definition |
 |---|---|---|
-| f0 | `last_line_question` | Last non-empty line of `tail`, with trailing whitespace and the characters `` *_`)"' `` removed, ends with `?` |
+| f0 | `last_line_question` | Take the last line of `tail` (split as Rust `str::lines`) whose `trim()` is non-empty. Trim trailing whitespace and `` *_`)"' `` characters from its end. The feature is 1 if it then ends with `?` |
 | f1 | `has_question` | `tail` contains `?` |
 | f2 | `offer` | `\b(let me know if|would you like me to|want me to|if you'd like|if you would like|happy to)\b` |
 | f3 | `decision` | `\b(should i|which (option|one|approach)|do you want|would you prefer|please (confirm|choose|decide)|before i proceed|your call|need your (input|decision))\b` |
 | f4 | `blocker` | `\b(permission denied|missing|not found|failed to|unable to|can't continue|cannot continue|blocked|need you to|credentials?|api key|unauthori[sz]ed|forbidden|rate limit)\b` |
 | f5 | `completion` | `(all tests pass|\bdone\b|\bcompleted?\b|\bfinished\b|✅|successfully|\bmerged\b|\bfixed\b)` |
-| f6 | `code_ratio` | Characters inside fenced blocks (```) in `text` ÷ `len(text)`, or 0 if `text` is empty |
+| f6 | `code_ratio` | Split `text` on ```` ``` ````. Sum the lengths of the odd-indexed segments (fence markers excluded; an unclosed fence runs to the end) and divide by `len(text)`. 0 if `text` is empty |
 | f7 | `length` | `ln(1 + len(text)) / ln(1 + 16384)` |
 | f8 | `options_list` | `tail` has at least 2 lines matching `^\s*(\d+[.)]|[-*•]|\(?[a-d][.)])\s` **and** f1 |
 | f9 | `error_marker` | `(\berror\b|exception|traceback|exit code [1-9])` |
