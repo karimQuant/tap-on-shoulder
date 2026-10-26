@@ -40,12 +40,16 @@ fn parity_fixtures() {
     assert!(!fixtures.is_empty(), "parity.json is empty");
     let h = head::LinearHead::embedded().expect("assets/head.json");
     let need_model = h.variant == head::Variant::Embed;
-    if classify::model_status() != "embedded" {
+    if classify::model_status() != "embedded" && need_model {
+        // Builds without the model (plain CI jobs) cannot check embed parity.
+        // The `model` CI job and release builds set TAP_REQUIRE_MODEL=embed,
+        // which makes build.rs fail without assets and this test mandatory.
         assert!(
-            !need_model,
-            "head variant `embed` needs the model: fetch assets/potion-base-8M first"
+            std::env::var("TAP_REQUIRE_MODEL").as_deref() != Ok("embed"),
+            "TAP_REQUIRE_MODEL=embed but the model is absent"
         );
-        eprintln!("NOTE parity_fixtures: model absent, token ids not checked");
+        eprintln!("SKIP parity_fixtures: model absent (run scripts/fetch-model.sh)");
+        return;
     }
     for (i, fx) in fixtures.iter().enumerate() {
         let text = features::prepare_text(&fx.text);
