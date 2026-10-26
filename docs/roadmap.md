@@ -4,7 +4,7 @@
 
 - [x] Concept and research ([verified interfaces](design/verified-interfaces.md))
 - [x] Proposed workflow ([diagram](assets/workflow.svg))
-- [ ] Product spec, architecture, and open questions in `docs/design/`
+- [x] [Product spec](design/product-spec.md), [architecture](design/architecture.md), [model](design/model.md), and [open questions](design/open-questions.md)
 - [ ] Spike: confirm the unverified hook behaviours against real Claude Code
 - [ ] Record the real demo (terminal and phone side by side)
 

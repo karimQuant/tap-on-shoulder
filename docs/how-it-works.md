@@ -65,7 +65,8 @@ The plugin sends one notification to your ntfy topic: project folder name, wait 
 
 | Failure | Behaviour |
 |---|---|
-| Binary or model missing or unverified | Shell fallback sends a generic "waiting" tap and logs why |
+| Binary missing or unverified | A one-line warning at session start, plus a log entry. No taps until the background install succeeds |
+| Embedded model fails to load | Rules-only classification, logged |
 | Classifier unsure | `lean = "alert"`: tap rather than stay silent |
 | ntfy unreachable | Limited retries, then logged and shown in `tap doctor`. Never counted as delivered |
 | Machine slept or restarted | Wall-clock check on the next hook. The `notified` flag prevents duplicates |
