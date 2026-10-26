@@ -1,7 +1,7 @@
 # Configuration
 
-> [!WARNING]
-> **Proposed.** These keys and defaults are design decisions. They are not a working interface yet.
+> [!NOTE]
+> These keys are implemented in v0.1. `/tap-on-shoulder:setup` writes a starter file, and `/tap-on-shoulder:doctor` reports invalid or ignored keys.
 
 The configuration lives in `~/.config/tap-on-shoulder/config.toml` (or under `$XDG_CONFIG_HOME`). A project can override some keys (see below). `tap config check` validates both.
 

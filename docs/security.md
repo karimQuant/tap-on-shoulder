@@ -1,6 +1,6 @@
 # Security & privacy
 
-tap-on-shoulder watches AI agents, so it has to be easy to trust. This page states exactly what it touches. Everything here is the **proposed** design. Each guarantee will be tested before release.
+tap-on-shoulder watches AI agents, so it has to be easy to trust. This page states exactly what it touches. Every guarantee below is implemented in v0.1 and covered by automated tests, plus an independent security review.
 
 ## What it reads
 

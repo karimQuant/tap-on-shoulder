@@ -12,17 +12,20 @@ When a Claude Code session has been waiting for **you** for 5 minutes, you get *
 
 </div>
 
-> [!WARNING]
-> **🚧 Planning stage. Nothing is implemented yet.** The commands below show the install experience we're building toward. Follow the [roadmap](docs/roadmap.md) or [help shape it](CONTRIBUTING.md).
+> [!NOTE]
+> **Alpha.** It works end to end and is tested against real Claude Code sessions (2.1.310). The classifier is a **preview**: it is trained on synthetic data and tuned so that it doesn't miss questions. Linux and macOS only. See [what's verified](docs/design/verified-interfaces.md).
 
 ## Install
+
+Inside Claude Code:
 
 ```text
 /plugin marketplace add karimQuant/tap-on-shoulder
 /plugin install tap-on-shoulder@tap-on-shoulder
+/tap-on-shoulder:setup
 ```
 
-Then run `tap setup` and subscribe to the printed topic in the [ntfy](https://ntfy.sh) app. That's the whole setup. [Full guide →](docs/getting-started.md)
+`setup` prints your private ntfy topic. Subscribe to it in the [ntfy](https://ntfy.sh) app, then run `/tap-on-shoulder:test` to get your first tap. The plugin downloads its small verified binary in the background on first use. [Full guide →](docs/getting-started.md)
 
 ## The result
 
@@ -46,7 +49,7 @@ tap-on-shoulder alerts only on **continuous waiting** and tells you **what's nee
 
 ## Security at a glance
 
-- 🔒 **Runs locally.** Classification uses a small embedded model on your CPU. No cloud LLM and no hosted backend.
+- 🔒 **Runs locally.** Classification uses a small embedded model (model2vec, under 2 ms on a CPU). No cloud LLM and no hosted backend.
 - 📤 **Sends one thing:** a short, redacted notification (project, wait time, what's needed) to *your* ntfy topic. No telemetry.
 - 🙈 **Never reads your code** or transcript files. It sees only the hook data Claude Code gives plugins.
 - ✋ **Never acts.** It cannot approve permissions, type into a session, or resume a task. It only watches.

@@ -1,6 +1,6 @@
 # Product spec
 
-**Status:** draft for v0.1. Statements are **Proposed** unless marked otherwise. The Claude Code facts behind this spec are in [verified-interfaces.md](verified-interfaces.md).
+**Status:** implemented in v0.1 alpha. The acceptance scenarios are automated in `tests/scenarios_core.rs` and `scripts/e2e.sh`. The Claude Code facts behind this spec are in [verified-interfaces.md](verified-interfaces.md).
 
 ## Problem
 

@@ -5,17 +5,19 @@
 - [x] Concept and research ([verified interfaces](design/verified-interfaces.md))
 - [x] Proposed workflow ([diagram](assets/workflow.svg))
 - [x] [Product spec](design/product-spec.md), [architecture](design/architecture.md), [model](design/model.md), and [open questions](design/open-questions.md)
-- [ ] Spike: confirm the unverified hook behaviours against real Claude Code
+- [x] Spike: confirm the hook behaviours against real Claude Code
 - [ ] Record the real demo (terminal and phone side by side)
 
-## v0.1: the first tap
+## v0.1 alpha: the first tap
 
-- [ ] Plugin hooks that open and close waiting episodes
-- [ ] Detached per-episode timer with dedup and restart handling
-- [ ] Event rules plus embedded classifier (model2vec)
-- [ ] ntfy notifications with redaction and privacy modes
-- [ ] `tap setup`, `tap test`, `tap doctor`, and `TAP_GRACE_OVERRIDE` for testing
-- [ ] Release bar for the classifier: `needs_decision` recall ≥ 0.95 and macro-F1 ≥ 0.85 on at least 200 real, hand-labelled message endings
+- [x] Plugin hooks that open and close waiting episodes, bound to tool calls
+- [x] One on-demand sweeper with at-most-once delivery, dedup, and restart handling
+- [x] Event rules plus embedded classifier (model2vec + linear head, preview)
+- [x] ntfy notifications with redaction and privacy modes
+- [x] `/tap-on-shoulder:setup`, `:test`, `:doctor`; `tap classify` and `tap label` in the terminal
+- [x] Real end-to-end test against Claude Code (`scripts/e2e.sh`)
+- [ ] First signed binary prerelease (`bin-v0.1.0-alpha.1`)
+- [ ] Release bar for the classifier: `needs_decision` recall ≥ 0.95 and macro-F1 ≥ 0.85 on at least 200 real, hand-labelled message endings (collect them with `training.collect` + `tap label`)
 
 ## Later
 

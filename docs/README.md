@@ -1,7 +1,7 @@
 # tap-on-shoulder documentation
 
-> [!WARNING]
-> **Planning stage.** These pages describe the design and the experience we're building toward. Commands and config keys are **proposals**, not working interfaces.
+> [!NOTE]
+> **Alpha.** These pages describe v0.1 as it is built and tested. Anything not yet built is marked **Proposed**.
 
 ## Start here
 

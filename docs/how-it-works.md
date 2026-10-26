@@ -1,7 +1,7 @@
 # How it works
 
 > [!NOTE]
-> This page describes the **proposed** design. The Claude Code interfaces it relies on are listed, with links to the official docs, in [Verified interfaces](design/verified-interfaces.md).
+> This page describes how v0.1 works. The Claude Code behaviour it relies on is listed, with links and spike results, in [Verified interfaces](design/verified-interfaces.md).
 
 ![tap-on-shoulder workflow](assets/workflow.svg)
 
