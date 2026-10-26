@@ -173,11 +173,18 @@ fn s02_reply_cancels() {
 fn s03_resume_cancels_stale() {
     let mock = MockNtfy::start(Mode::Ok);
     let mut env = env_for(&mock.url);
-    env.set("TAP_GRACE_OVERRIDE", "3s");
+    // The sweeper pauses between seeing a due episode and claiming it, so
+    // the new turn lands exactly in that window.
+    env.set("TAP_TEST_SWEEP_CLAIM_PAUSE_MS", "1500");
 
-    // Claude resumes (tool activity) before the grace period ends.
     hook(&env, &stop("s03", "Old turn: which option should I take?"));
     let first = episode(&env, "s03")["id"].clone();
+    // The old episode is due and the sweeper is about to claim it...
+    assert!(
+        eventually(secs(5.0), || env.log_text().contains("test_claim_pause")),
+        "sweeper never reached the claim"
+    );
+    // ...when Claude resumes and a new turn replaces it.
     let bash = json!({"command": "cargo build"});
     hook(&env, &pre_tool("s03", "Bash", "t1", bash.clone()));
     assert_eq!(episode(&env, "s03")["closed_reason"], "activity");
@@ -185,6 +192,7 @@ fn s03_resume_cancels_stale() {
     hook(&env, &stop("s03", "New turn: deploy to staging or prod?"));
     let second = episode(&env, "s03")["id"].clone();
     assert_ne!(first, second, "a newer turn gets a new episode id");
+    assert_eq!(mock.count(), 0, "the replaced episode must not be sent");
 
     // A resumed session (SessionStart) closes a stale episode too.
     hook(&env, &stop("s03r", "Stale: shall I continue?"));
@@ -194,10 +202,13 @@ fn s03_resume_cancels_stale() {
     );
     assert_eq!(episode(&env, "s03r")["closed_reason"], "session_start");
 
-    assert_eq!(mock.wait_for(1, secs(6.0)), 1);
-    settle(&mock, secs(1.5), 1);
+    assert_eq!(mock.wait_for(1, secs(8.0)), 1);
+    settle(&mock, secs(2.0), 1);
     let msg = mock.requests()[0].json()["message"].to_string();
     assert!(msg.contains("New turn"), "{msg}");
+    let ep = episode(&env, "s03");
+    assert_eq!(ep["id"], second);
+    assert_eq!(ep["status"], "notified");
 }
 
 fn with(mut v: Value, extra: Value) -> Value {
@@ -224,15 +235,15 @@ fn s04_silent_tool_no_tap() {
         1
     );
 
-    // Background work still running: Stop opens nothing.
+    // Background work still running and Claude is just working: Stop opens
+    // nothing.
+    let mut working = env_for(&mock.url);
+    working.set("TAP_TEST_FORCE_CATEGORY", "info");
     hook(
-        &env,
-        &stop_with_bg(
-            "s04b",
-            "Started the build in the background. Want me to wait?",
-        ),
+        &working,
+        &stop_with_bg("s04b", "Started the build in the background."),
     );
-    assert!(episode(&env, "s04b").is_null());
+    assert!(episode(&working, "s04b").is_null());
     settle(&mock, secs(3.0), 0);
 }
 
@@ -357,7 +368,9 @@ fn s06b_approved_long_tool_no_tap() {
     let input = json!({"command": "make test"});
     hook(&env, &pre_tool("s06b", "Bash", "t1", input.clone()));
     hook(&env, &permission_request("s06b", "Bash", input.clone()));
-    // The user approves; the tool now runs as a child of Claude.
+    // The user approves (which takes over a second); the tool now runs as a
+    // child of Claude.
+    std::thread::sleep(secs(1.1));
     claude.start_tool();
 
     assert!(
@@ -405,23 +418,19 @@ fn s06c_parallel_tool_does_not_close_permission() {
     );
     assert_eq!(status(&env, "s06c"), "open");
 
-    // No hash match: falls back to the most recent pending entry of that name.
+    // No hash match and one pending entry of that name: binds to it.
     hook(
         &env,
         &pre_tool("s06f", "Bash", "f1", json!({"command": "a"})),
     );
     hook(
         &env,
-        &pre_tool("s06f", "Bash", "f2", json!({"command": "b"})),
-    );
-    hook(
-        &env,
         &permission_request("s06f", "Bash", json!({"command": "other"})),
     );
-    assert_eq!(episode(&env, "s06f")["tool_use_id"], "f2");
+    assert_eq!(episode(&env, "s06f")["tool_use_id"], "f1");
     hook(
         &env,
-        &post_tool("s06f", "Bash", "f2", json!({"command": "b"})),
+        &post_tool("s06f", "Bash", "f1", json!({"command": "a"})),
     );
     assert_eq!(status(&env, "s06f"), "closed");
 
@@ -444,6 +453,7 @@ fn s06d_permission_postpone_cap() {
     let input = json!({"command": "long job"});
     hook(&env, &pre_tool("s06d", "Bash", "t1", input.clone()));
     hook(&env, &permission_request("s06d", "Bash", input));
+    std::thread::sleep(secs(1.1));
     claude.start_tool();
     // The tool keeps running past the postponement cap: the tap goes out.
     assert_eq!(mock.wait_for(1, secs(20.0)), 1);
@@ -685,20 +695,33 @@ fn s_unknown_state_no_tap() {
 #[test]
 fn sweeper_exit_race_no_orphan() {
     let mock = MockNtfy::start(Mode::Ok);
-    let env = env_for(&mock.url);
-    // Arm a new episode right around the moment the previous sweeper decides
-    // to exit; every episode must still be delivered.
-    for i in 0..5 {
-        let s = format!("race{i}");
-        hook(&env, &stop(&s, QUESTION));
-        assert_eq!(
-            mock.wait_for(i + 1, secs(5.0)),
-            i + 1,
-            "episode {i} orphaned"
-        );
-        std::thread::sleep(Duration::from_millis(30 * i as u64));
-    }
-    settle(&mock, secs(1.0), 5);
+    let mut env = env_for(&mock.url);
+    // The sweeper pauses after releasing its lock and before the final
+    // re-scan: the exact window of the exit race.
+    env.set("TAP_TEST_SWEEP_EXIT_PAUSE_MS", "1500");
+    hook(&env, &stop("race0", QUESTION));
+    assert_eq!(mock.wait_for(1, secs(5.0)), 1);
+    assert!(
+        eventually(secs(5.0), || env.log_text().contains("test_exit_pause")),
+        "sweeper never reached its exit window"
+    );
+
+    // An episode opens inside the window. It is written directly, so no hook
+    // spawns a fresh sweeper: only the exiting one's re-scan can deliver it.
+    let mut st = env.state_json("race0").unwrap();
+    st["session_id"] = json!("race1");
+    let ep = &mut st["episode"];
+    ep["id"] = json!("00000000000race1");
+    ep["status"] = json!("open");
+    ep["due_at"] = json!(now_s());
+    ep["attempts"] = json!(0);
+    ep["sending_since"] = Value::Null;
+    ep["closed_reason"] = Value::Null;
+    write_state(&env, "race1", &st);
+
+    assert_eq!(mock.wait_for(2, secs(5.0)), 2, "episode orphaned");
+    settle(&mock, secs(1.0), 2);
+    assert_eq!(status(&env, "race1"), "notified");
 }
 
 fn all_fixtures(s: &str) -> Vec<Value> {
@@ -1016,4 +1039,470 @@ fn cli_setup_doctor_version() {
     // An invalid user config makes doctor exit 1.
     env.write_user_config("[grace]\nquestion = \"forever\"\n[notify.ntfy]\ntopic = \"t\"\n");
     assert_eq!(env.run(&["doctor"]).status.code(), Some(1));
+}
+
+// ---------------------------------------------------------------- review regressions
+
+fn now_s() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs() as i64
+}
+
+/// Hold a session's state lock like a hook or the sweeper would.
+fn lock_session(env: &TestEnv, s: &str) -> std::fs::File {
+    use std::os::unix::io::AsRawFd;
+    let f = std::fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .truncate(false)
+        .open(env.state_dir().join(format!("{s}.lock")))
+        .unwrap();
+    // SAFETY: plain flock on a descriptor we own.
+    assert_eq!(unsafe { libc::flock(f.as_raw_fd(), libc::LOCK_EX) }, 0);
+    f
+}
+
+/// Replace a session's state atomically (temp file + rename) under its lock.
+fn write_state(env: &TestEnv, s: &str, v: &Value) {
+    let _l = lock_session(env, s);
+    let tmp = env.state_dir().join(format!(".tmp-test-{s}"));
+    std::fs::write(&tmp, v.to_string()).unwrap();
+    std::fs::rename(&tmp, env.state_dir().join(format!("{s}.json"))).unwrap();
+}
+
+fn set_age(path: &std::path::Path, age: Duration) {
+    let t = std::time::SystemTime::now() - age;
+    std::fs::File::options()
+        .write(true)
+        .open(path)
+        .unwrap()
+        .set_modified(t)
+        .unwrap();
+}
+
+fn denied(s: &str, tool: &str) -> Value {
+    with(base("PermissionDenied", s, CWD), json!({"tool_name": tool}))
+}
+
+#[test]
+fn rv_sweeper_lock_session_named_sweeper() {
+    // A session id equal to the old sweeper lock name must not deadlock.
+    let mock = MockNtfy::start(Mode::Ok);
+    let env = env_for(&mock.url);
+    let start = Instant::now();
+    hook(&env, &stop("sweeper", QUESTION));
+    assert!(start.elapsed() < secs(2.0), "{:?}", start.elapsed());
+    assert_eq!(mock.wait_for(1, secs(5.0)), 1, "{}", env.log_text());
+    assert!(eventually(secs(2.0), || status(&env, "sweeper") == "notified"));
+    assert!(env.data.path().join("sweeper.lock").exists());
+    let start = Instant::now();
+    hook(&env, &user_prompt("sweeper"));
+    assert!(start.elapsed() < secs(2.0), "{:?}", start.elapsed());
+}
+
+#[test]
+fn rv_hook_lock_timeout() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let env = env_for(&mock.url);
+    hook(&env, &session_start("rvl"));
+    let held = lock_session(&env, "rvl");
+    let start = Instant::now();
+    let out = env.hook(&stop("rvl", QUESTION));
+    let took = start.elapsed();
+    assert_quiet(&out);
+    assert!(took >= secs(1.9) && took < secs(4.0), "{took:?}");
+    assert!(env.log_text().contains("lock_timeout"));
+    assert!(episode(&env, "rvl").is_null());
+    drop(held);
+    settle(&mock, secs(1.5), 0);
+}
+
+#[test]
+fn rv_stdin_oversize() {
+    let env = env_for(&MockNtfy::refused_url());
+    let big = pre_tool(
+        "rvo",
+        "Write",
+        "w1",
+        json!({"content": "x".repeat(9 << 20)}),
+    );
+    assert_quiet(&env.hook(&big));
+    assert!(
+        env.log_text().contains("\"oversize\""),
+        "{}",
+        env.log_text()
+    );
+    assert!(env.state_json("rvo").is_none());
+
+    // Just under the cap is still read.
+    let ok = pre_tool(
+        "rvo",
+        "Write",
+        "w2",
+        json!({"content": "x".repeat(7 << 20)}),
+    );
+    assert_quiet(&env.hook(&ok));
+    let st = env.state_json("rvo").unwrap();
+    assert_eq!(st["pending_tools"][0]["tool_use_id"], "w2");
+}
+
+#[test]
+fn rv_setup_random_failure() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    let cfg = env.config_dir().join("config.toml");
+    std::fs::remove_file(&cfg).unwrap();
+    env.set("TAP_TEST_GETRANDOM_FAIL", "1");
+    let out = env.run(&["setup", "--server", &mock.url]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("random"));
+    assert!(!String::from_utf8_lossy(&out.stdout).contains("tap-"));
+    assert!(!cfg.exists(), "no config with a short topic");
+
+    env.unset("TAP_TEST_GETRANDOM_FAIL");
+    assert!(env.run(&["setup", "--server", &mock.url]).status.success());
+    let text = std::fs::read_to_string(&cfg).unwrap();
+    let topic = regex::Regex::new(r#"topic = "(tap-[a-z0-9]+)""#)
+        .unwrap()
+        .captures(&text)
+        .unwrap()[1]
+        .to_string();
+    assert_eq!(topic.len(), 4 + 24, "{topic}");
+}
+
+#[test]
+fn rv_rebind_starts_fresh() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    env.set("TAP_GRACE_OVERRIDE", "1h");
+    let a = json!({"command": "git push"});
+    let b = json!({"command": "rm -rf build"});
+    hook(&env, &pre_tool("rvr", "Bash", "t1", a.clone()));
+    hook(&env, &pre_tool("rvr", "Bash", "t2", b.clone()));
+    hook(&env, &permission_request("rvr", "Bash", a.clone()));
+    hook(&env, &permission_prompt("rvr"));
+    let first = episode(&env, "rvr");
+    assert_eq!(first["tool_use_id"], "t1");
+    assert!(first["confirmed_at"].is_i64());
+    std::thread::sleep(secs(1.2));
+
+    // Same binding: the episode keeps its clock.
+    hook(&env, &permission_request("rvr", "Bash", a));
+    let same = episode(&env, "rvr");
+    assert_eq!(same["opened_at"], first["opened_at"]);
+    assert_eq!(same["confirmed_at"], first["confirmed_at"]);
+
+    // A prompt for a different call: the previous one was answered.
+    hook(&env, &permission_request("rvr", "Bash", b));
+    let ep = episode(&env, "rvr");
+    assert_eq!(ep["tool_use_id"], "t2");
+    let opened = ep["opened_at"].as_i64().unwrap();
+    assert!(opened > first["opened_at"].as_i64().unwrap(), "{ep}");
+    assert_eq!(ep["bound_at"].as_i64(), Some(opened));
+    assert_eq!(ep["due_at"].as_i64(), Some(opened + 3600));
+    assert_eq!(ep["postponed_s"], 0);
+    assert!(ep["confirmed_at"].is_null(), "{ep}");
+
+    // AskUserQuestion rebinding starts fresh too.
+    std::thread::sleep(secs(1.2));
+    let ask = ask_user_question_input("Which region?");
+    hook(&env, &pre_tool("rvr", "AskUserQuestion", "q1", ask));
+    let q = episode(&env, "rvr");
+    assert_eq!(q["tool_use_id"], "q1");
+    assert!(q["opened_at"].as_i64().unwrap() > opened, "{q}");
+    hook(&env, &session_end("rvr"));
+    settle(&mock, secs(0.5), 0);
+}
+
+#[test]
+fn rv_stop_background_needs_user() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut ask = env_for(&mock.url);
+    ask.set("TAP_TEST_FORCE_CATEGORY", "needs_decision");
+    hook(
+        &ask,
+        &stop_with_bg("rvb", "Build is running. Deploy to prod?"),
+    );
+    assert_eq!(status(&ask, "rvb"), "open");
+
+    let mut blocked = env_for(&mock.url);
+    blocked.set("TAP_TEST_FORCE_CATEGORY", "blocked");
+    hook(
+        &blocked,
+        &stop_with_bg("rvbb", "Build is running. Missing API key."),
+    );
+    assert_eq!(episode(&blocked, "rvbb")["category"], "blocked");
+
+    // `done` with background work means "working", even with completion taps.
+    let mut done = env_for(&mock.url);
+    done.set("TAP_TEST_FORCE_CATEGORY", "done");
+    done.write_user_config(&format!(
+        "[notify.ntfy]\nserver = \"{}\"\ntopic = \"tap-test-topic\"\n[alerts]\ncompletion = true\n",
+        mock.url
+    ));
+    hook(&done, &stop_with_bg("rvbd", "Step one finished."));
+    assert!(episode(&done, "rvbd").is_null());
+    assert!(done.log_text().contains("background_running"));
+
+    assert_eq!(mock.wait_for(2, secs(6.0)), 2);
+    settle(&mock, secs(1.0), 2);
+}
+
+#[test]
+fn rv_ambiguous_binding() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    env.set("TAP_GRACE_OVERRIDE", "1h");
+
+    // Two pending Bash calls, neither matching: bind to both.
+    hook(
+        &env,
+        &pre_tool("rva", "Bash", "f1", json!({"command": "a"})),
+    );
+    hook(
+        &env,
+        &pre_tool("rva", "Bash", "f2", json!({"command": "b"})),
+    );
+    hook(
+        &env,
+        &permission_request("rva", "Bash", json!({"command": "other"})),
+    );
+    let ep = episode(&env, "rva");
+    assert!(ep["tool_use_id"].is_null(), "{ep}");
+    assert_eq!(ep["candidate_ids"], json!(["f1", "f2"]));
+    hook(
+        &env,
+        &post_tool("rva", "Bash", "f2", json!({"command": "b"})),
+    );
+    assert_eq!(status(&env, "rva"), "open", "f1 may still be waiting");
+    hook(
+        &env,
+        &pre_tool("rva", "Read", "r1", json!({"file_path": "x"})),
+    );
+    hook(
+        &env,
+        &post_tool("rva", "Read", "r1", json!({"file_path": "x"})),
+    );
+    assert_eq!(status(&env, "rva"), "open");
+    hook(
+        &env,
+        &post_tool("rva", "Bash", "f1", json!({"command": "a"})),
+    );
+    assert_eq!(episode(&env, "rva")["closed_reason"], "tool_done");
+
+    // No pending call of that tool: bound by name.
+    hook(
+        &env,
+        &permission_request("rvn", "Bash", json!({"command": "x"})),
+    );
+    let ep = episode(&env, "rvn");
+    assert_eq!(ep["bound_tool_name"], "Bash");
+    assert!(ep["tool_use_id"].is_null());
+    // Other activity does not close it (no "any activity" rule)...
+    hook(
+        &env,
+        &pre_tool("rvn", "Read", "r1", json!({"file_path": "x"})),
+    );
+    hook(
+        &env,
+        &post_tool("rvn", "Read", "r1", json!({"file_path": "x"})),
+    );
+    assert_eq!(status(&env, "rvn"), "open");
+    // ...but the same tool finishing does.
+    hook(
+        &env,
+        &post_tool("rvn", "Bash", "z9", json!({"command": "x"})),
+    );
+    assert_eq!(episode(&env, "rvn")["closed_reason"], "tool_done");
+    settle(&mock, secs(0.5), 0);
+}
+
+#[test]
+fn rv_claim_rechecks_due() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    env.set("TAP_TEST_SWEEP_CLAIM_PAUSE_MS", "2000");
+    hook(&env, &stop("rvc", QUESTION));
+    assert!(eventually(secs(5.0), || env
+        .log_text()
+        .contains("test_claim_pause")));
+    // Between the sweeper's due check and its claim, the episode is pushed
+    // into the future (same id, status, and attempts).
+    let mut st = env.state_json("rvc").unwrap();
+    st["episode"]["due_at"] = json!(now_s() + 3600);
+    write_state(&env, "rvc", &st);
+    settle(&mock, secs(3.5), 0);
+    assert_eq!(status(&env, "rvc"), "open");
+    hook(&env, &session_end("rvc"));
+}
+
+#[test]
+fn rv_prune_keeps_live_locks() {
+    let env = env_for(&MockNtfy::refused_url());
+    let day2 = Duration::from_secs(48 * 3600);
+    let dir = env.state_dir();
+    // A live session whose lock file is old but whose state is fresh.
+    hook(&env, &pre_tool("live", "Bash", "t1", json!({})));
+    set_age(&dir.join("live.lock"), day2);
+    // A stale session: state and lock both old.
+    hook(&env, &pre_tool("stale", "Bash", "t1", json!({})));
+    set_age(&dir.join("stale.json"), day2);
+    set_age(&dir.join("stale.lock"), day2);
+    // Orphaned locks, old and new.
+    std::fs::write(dir.join("orphanold.lock"), "").unwrap();
+    set_age(&dir.join("orphanold.lock"), day2);
+    std::fs::write(dir.join("orphannew.lock"), "").unwrap();
+
+    hook(&env, &session_start("pruner"));
+    assert!(dir.join("live.lock").exists(), "live lock deleted");
+    assert!(dir.join("live.json").exists());
+    assert!(!dir.join("stale.json").exists());
+    assert!(!dir.join("stale.lock").exists());
+    assert!(!dir.join("orphanold.lock").exists());
+    assert!(dir.join("orphannew.lock").exists());
+}
+
+#[test]
+fn rv_zombie_session_gone() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    // Exits after 1 s and stays a zombie: it is not reaped until the end.
+    let mut child = Command::new("sleep").arg("1").spawn().unwrap();
+    env.set("TAP_TEST_CLAUDE_PID", &child.id().to_string());
+    env.set("TAP_GRACE_OVERRIDE", "3s");
+    hook(&env, &stop("rvz", QUESTION));
+    assert_eq!(
+        env.state_json("rvz").unwrap()["claude"]["pid"].to_string(),
+        child.id().to_string()
+    );
+    assert!(eventually(secs(7.0), || episode(&env, "rvz")
+        ["closed_reason"]
+        == "session_gone"));
+    settle(&mock, secs(0.5), 0);
+    let _ = child.wait();
+}
+
+#[test]
+fn rv_detect_claude_once() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut a = FakeClaude::idle();
+    let b = FakeClaude::idle();
+    let mut env = env_for(&mock.url);
+    env.set("TAP_GRACE_OVERRIDE", "1h");
+    let claude = |env: &TestEnv| env.state_json("rvd").unwrap()["claude"]["pid"].to_string();
+
+    env.set("TAP_TEST_CLAUDE_PID", &a.pid());
+    hook(&env, &stop("rvd", QUESTION));
+    assert_eq!(claude(&env), a.pid());
+    hook(&env, &user_prompt("rvd"));
+
+    // Detection is not repeated while the recorded process lives.
+    env.set("TAP_TEST_CLAUDE_PID", &b.pid());
+    hook(&env, &stop("rvd", QUESTION));
+    assert_eq!(claude(&env), a.pid());
+    hook(&env, &user_prompt("rvd"));
+
+    // Once it is gone, the next episode detects again.
+    a.kill();
+    hook(&env, &stop("rvd", QUESTION));
+    assert_eq!(claude(&env), b.pid());
+    hook(&env, &session_end("rvd"));
+    settle(&mock, secs(0.5), 0);
+}
+
+#[test]
+fn rv_permission_denied_own_tool() {
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    env.set("TAP_GRACE_OVERRIDE", "1h");
+
+    // Bound by id.
+    let ls = json!({"command": "ls"});
+    hook(&env, &pre_tool("rvp", "Bash", "t1", ls.clone()));
+    hook(&env, &permission_request("rvp", "Bash", ls));
+    hook(&env, &denied("rvp", "Write"));
+    assert_eq!(status(&env, "rvp"), "open");
+    hook(&env, &denied("rvp", "Bash"));
+    assert_eq!(episode(&env, "rvp")["closed_reason"], "permission_denied");
+
+    // Bound to candidates.
+    hook(
+        &env,
+        &pre_tool("rvpc", "Bash", "c1", json!({"command": "a"})),
+    );
+    hook(
+        &env,
+        &pre_tool("rvpc", "Bash", "c2", json!({"command": "b"})),
+    );
+    hook(
+        &env,
+        &permission_request("rvpc", "Bash", json!({"command": "z"})),
+    );
+    hook(&env, &denied("rvpc", "Read"));
+    assert_eq!(status(&env, "rvpc"), "open");
+    hook(&env, &denied("rvpc", "Bash"));
+    assert_eq!(status(&env, "rvpc"), "closed");
+
+    // Bound by name.
+    hook(
+        &env,
+        &permission_request("rvpn", "Bash", json!({"command": "z"})),
+    );
+    hook(&env, &denied("rvpn", "Edit"));
+    assert_eq!(status(&env, "rvpn"), "open");
+    hook(&env, &denied("rvpn", "Bash"));
+    assert_eq!(status(&env, "rvpn"), "closed");
+
+    // Unbound: any denial closes, as before.
+    hook(&env, &stop("rvpu", QUESTION));
+    hook(&env, &denied("rvpu", "Bash"));
+    assert_eq!(status(&env, "rvpu"), "closed");
+    settle(&mock, secs(0.5), 0);
+}
+
+#[test]
+fn rv_postpone_window() {
+    let mut claude = FakeClaude::with_tool();
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = env_for(&mock.url);
+    env.set("TAP_TEST_CLAUDE_PID", &claude.pid());
+    env.set("TAP_DEV_FAST", "1");
+    env.set("TAP_GRACE_OVERRIDE", "2s");
+
+    // A parallel tool started just before the prompt, in the same wall-clock
+    // second, is not the approved tool: no postponement.
+    let ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .subsec_millis() as u64;
+    std::thread::sleep(Duration::from_millis(1000 - ms + 20));
+    claude.start_tool();
+    let input = json!({"command": "deploy"});
+    hook(&env, &pre_tool("rvw", "Bash", "t1", input.clone()));
+    hook(&env, &permission_request("rvw", "Bash", input));
+    assert_eq!(mock.wait_for(1, secs(6.0)), 1, "{}", env.log_text());
+    assert_eq!(episode(&env, "rvw")["postponed_s"], 0);
+}
+
+#[test]
+fn rv_write_guard_close_during_send() {
+    let mock = MockNtfy::start(Mode::Ok);
+    mock.set_delay(secs(2.0));
+    let env = env_for(&mock.url);
+    hook(&env, &stop("rvg", QUESTION));
+    assert_eq!(mock.wait_for(1, secs(5.0)), 1);
+    assert_eq!(status(&env, "rvg"), "sending");
+    // The user replies while the POST is in flight: the hook wins.
+    hook(&env, &user_prompt("rvg"));
+    assert_eq!(status(&env, "rvg"), "closed");
+    assert!(eventually(secs(4.0), || env
+        .log_text()
+        .contains("guard_lost")));
+    let ep = episode(&env, "rvg");
+    assert_eq!(ep["status"], "closed");
+    assert_eq!(ep["closed_reason"], "user_prompt");
+    settle(&mock, secs(1.0), 1);
 }
