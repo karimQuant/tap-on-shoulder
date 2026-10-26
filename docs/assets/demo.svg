@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" viewBox="0 0 1000 510" width="1000" height="510" role="img" aria-label="Demo placeholder: three Claude Code sessions; one waits for a decision; after 5 minutes the phone gets one tap-on-shoulder notification.">
+<title>tap-on-shoulder demo (placeholder animation)</title>
+<defs>
+  <linearGradient id="wall" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#1e3a5f"/><stop offset=".55" stop-color="#3b2f5c"/><stop offset="1" stop-color="#7a4b3a"/>
+  </linearGradient>
+</defs>
+<style>text{white-space:pre;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;}.ui{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}.g{fill:#3fb950}.a{fill:#d29922}.d{fill:#8b949e}.w{fill:#e6edf3}.c{fill:#79c0ff}@keyframes pulse{0%,60%{stroke-opacity:0}66%{stroke-opacity:1}80%,100%{stroke-opacity:.35}}.pulse{animation:pulse 16s infinite}@media (prefers-reduced-motion:reduce){*{animation:none!important}.s0,.s1,.s2,.s3,.s4,.s5,.s7,.t3,.nA,.nB{opacity:1!important}.w1{opacity:0!important}}@keyframes s0{0%,0%{opacity:0;}2%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s0{opacity:0;animation:s0 16s infinite;}@keyframes s1{0%,3.99%{opacity:0;}6%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s1{opacity:0;animation:s1 16s infinite;}@keyframes s2{0%,7.99%{opacity:0;}10%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s2{opacity:0;animation:s2 16s infinite;}@keyframes s3{0%,11.99%{opacity:0;}14%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s3{opacity:0;animation:s3 16s infinite;}@keyframes s4{0%,16.99%{opacity:0;}19%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s4{opacity:0;animation:s4 16s infinite;}@keyframes s5{0%,20.99%{opacity:0;}23%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s5{opacity:0;animation:s5 16s infinite;}@keyframes nA{0%,25.99%{opacity:0;transform:translateY(-14px);}28%,95.99%{opacity:1;transform:translateY(0);}96%,100%{opacity:0;transform:translateY(0);}}.nA{opacity:0;animation:nA 16s infinite;}@keyframes t1{0%,30.99%{opacity:0;}33%,43.99%{opacity:1;}44%,100%{opacity:0;}}.t1{opacity:0;animation:t1 16s infinite;}@keyframes t2{0%,43.99%{opacity:0;}46%,57.99%{opacity:1;}58%,100%{opacity:0;}}.t2{opacity:0;animation:t2 16s infinite;}@keyframes t3{0%,57.99%{opacity:0;}60%,95.99%{opacity:1;}96%,100%{opacity:0;}}.t3{opacity:0;animation:t3 16s infinite;}@keyframes s7{0%,47.99%{opacity:0;}50%,95.99%{opacity:1;}96%,100%{opacity:0;}}.s7{opacity:0;animation:s7 16s infinite;}@keyframes nB{0%,61.99%{opacity:0;transform:translateY(-14px);}64%,95.99%{opacity:1;transform:translateY(0);}96%,100%{opacity:0;transform:translateY(0);}}.nB{opacity:0;animation:nB 16s infinite;}@keyframes w1{0%,25.99%{opacity:0;}28%,57.99%{opacity:1;}58%,100%{opacity:0;}}.w1{opacity:0;animation:w1 16s infinite;}</style>
+
+<g>
+  <rect x="24" y="44" width="620" height="420" rx="12" fill="#0d1117" stroke="#30363d"/>
+  <rect x="24" y="44" width="620" height="34" rx="12" fill="#161b22"/>
+  <rect x="24" y="66" width="620" height="12" fill="#161b22"/>
+  <circle cx="44" cy="61" r="6" fill="#ff5f57"/>
+  <circle cx="64" cy="61" r="6" fill="#febc2e"/>
+  <circle cx="84" cy="61" r="6" fill="#28c840"/>
+  <text x="334" y="66" class="d ui" font-size="13" text-anchor="middle">~/work — claude</text>
+  <text x="46" y="118" class="s0 d" font-size="15" >❯ 3 Claude Code sessions running</text><text x="46" y="148" class="s1 g" font-size="15" >● web-app           working · npm test          12m</text><text x="46" y="178" class="s2 g" font-size="15" >● infra             working · terraform plan     4m</text><text x="46" y="208" class="s3 a" font-size="15" >● payments-service  stopped · waiting for you</text><text x="46" y="238" class="s4 w" font-size="15" >  ╰ Keep the legacy column (backward-compatible)</text><text x="46" y="268" class="s5 w" font-size="15" >    or drop it in this migration?</text><text x="46" y="312" class="t1 d" font-size="15" >  ⏱  waiting 0:30 · you&#x27;re away</text><text x="46" y="312" class="t2 d" font-size="15" >  ⏱  waiting 2:40 · still no reply</text><text x="46" y="312" class="t3 c" font-size="15" font-weight="700">  ⏱  waiting 5:00 → tap sent</text><text x="46" y="346" class="s7 g" font-size="15" >  ✓  web-app, infra still working → no alert</text>
+</g>
+
+<g>
+  <rect x="690" y="18" width="286" height="472" rx="44" fill="#111" stroke="#3a3a3c" stroke-width="3"/>
+  <rect x="700" y="28" width="266" height="452" rx="36" fill="url(#wall)"/>
+  <rect x="788.0" y="38" width="90" height="24" rx="12" fill="#000"/>
+  <text x="833.0" y="146" class="ui" font-size="58" fill="#fff" font-weight="300" text-anchor="middle">9:41</text>
+  <text x="833.0" y="86" class="ui" font-size="14" fill="#fff" fill-opacity=".85" text-anchor="middle">Tuesday, 28 October</text>
+  
+  <g class="nB">
+    <rect x="704" y="180" width="258" height="96" rx="18" fill="#f2f2f7" fill-opacity=".96"/>
+    <rect x="704" y="180" width="258" height="96" rx="18" fill="none" stroke="#0a84ff" stroke-width="2.5" class="pulse"/>
+    <rect x="718" y="194" width="20" height="20" rx="5" fill="#0a84ff"/>
+    <text x="746" y="209" class="ui" font-size="12" fill="#3c3c43" font-weight="600">TAP-ON-SHOULDER</text>
+    <text x="948" y="209" class="ui" font-size="11" fill="#8e8e93" text-anchor="end">now</text>
+    <text x="718" y="234" class="ui" font-size="13.5" fill="#000" font-weight="600">payments-service · waiting 5m</text>
+    <text x="718" y="255" class="ui" font-size="12.5" fill="#3c3c43">Needs a decision: keep or drop column?</text>
+  </g>
+  
+  <g class="nA">
+    <rect x="704" y="288" width="258" height="96" rx="18" fill="#f2f2f7" fill-opacity=".96"/>
+    
+    <rect x="718" y="302" width="20" height="20" rx="5" fill="#d97757"/>
+    <text x="746" y="317" class="ui" font-size="12" fill="#3c3c43" font-weight="600">CLAUDE  ·  via /rc</text>
+    <text x="948" y="317" class="ui w1" font-size="11" fill="#8e8e93" text-anchor="end">now</text><text x="948" y="317" class="ui t3" font-size="11" fill="#8e8e93" text-anchor="end">5m ago</text>
+    <text x="718" y="342" class="ui" font-size="13.5" fill="#000" font-weight="600">payments-service</text>
+    <text x="718" y="363" class="ui" font-size="12.5" fill="#3c3c43">Claude needs your input</text>
+  </g>
+  <rect x="778.0" y="468" width="110" height="5" rx="2.5" fill="#fff" fill-opacity=".8"/>
+</g>
+<text x="334" y="497" class="d ui" font-size="12" text-anchor="middle">Placeholder animation · real terminal + phone recording coming soon</text>
+</svg>
