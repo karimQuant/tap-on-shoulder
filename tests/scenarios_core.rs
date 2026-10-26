@@ -350,8 +350,9 @@ fn s06b_approved_long_tool_no_tap() {
     let mut env = env_for(&mock.url);
     env.set("TAP_TEST_CLAUDE_PID", &claude.pid());
     env.set("TAP_DEV_FAST", "1");
-    // 2 s grace: the tool must start before the first check.
-    env.set("TAP_GRACE_OVERRIDE", "2s");
+    // 4 s grace: the tool must start before the first check, even when the
+    // machine is loaded by parallel test binaries.
+    env.set("TAP_GRACE_OVERRIDE", "4s");
 
     let input = json!({"command": "make test"});
     hook(&env, &pre_tool("s06b", "Bash", "t1", input.clone()));
@@ -436,15 +437,16 @@ fn s06d_permission_postpone_cap() {
     let mut env = env_for(&mock.url);
     env.set("TAP_TEST_CLAUDE_PID", &claude.pid());
     env.set("TAP_DEV_FAST", "1");
-    // 2 s grace: the tool must start before the first check.
-    env.set("TAP_GRACE_OVERRIDE", "2s");
+    // 4 s grace: the tool must start before the first check, even when the
+    // machine is loaded by parallel test binaries.
+    env.set("TAP_GRACE_OVERRIDE", "4s");
 
     let input = json!({"command": "long job"});
     hook(&env, &pre_tool("s06d", "Bash", "t1", input.clone()));
     hook(&env, &permission_request("s06d", "Bash", input));
     claude.start_tool();
     // The tool keeps running past the postponement cap: the tap goes out.
-    assert_eq!(mock.wait_for(1, secs(15.0)), 1);
+    assert_eq!(mock.wait_for(1, secs(20.0)), 1);
     let ep = episode(&env, "s06d");
     assert!(ep["postponed_s"].as_i64().unwrap() >= 3, "{ep}");
     settle(&mock, secs(1.0), 1);

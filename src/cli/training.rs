@@ -6,14 +6,11 @@
 //! `UserPromptSubmit` of that session fills in `reply_after_s`.
 //! `tap label` turns entries into `labeled.jsonl`.
 
+use serde_json::{json, Value};
 use std::fs::OpenOptions;
 use std::io::{self, BufRead, Write};
 use std::os::unix::fs::OpenOptionsExt;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
-
-use regex::Regex;
-use serde_json::{json, Value};
 
 use crate::contract::{Category, Classification};
 use crate::log::Entry;
@@ -37,55 +34,63 @@ pub fn collected_path() -> Option<PathBuf> {
     state::data_dir().map(|d| d.join("training").join("collected.jsonl"))
 }
 
-struct Patterns {
-    ansi: Regex,
-    url: Regex,
-    email: Regex,
-    path: Regex,
-    win_path: Regex,
-    key: Regex,
-    long_token: Regex,
-}
-
-fn patterns() -> &'static Patterns {
-    static P: OnceLock<Patterns> = OnceLock::new();
-    P.get_or_init(|| Patterns {
-        ansi: Regex::new(r"\x1b(\[[0-9;?]*[ -/]*[@-~]|\][^\x07\x1b]*(\x07|\x1b\\)?|[@-Z\\-_])")
-            .expect("ansi regex"),
-        url: Regex::new(r"https?://\S+").expect("url regex"),
-        email: Regex::new(r"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}").expect("email"),
-        path: Regex::new(r"(?m)(^|\s)(~?/[\w.\-]+(?:/[\w.\-]+)+)").expect("path regex"),
-        win_path: Regex::new(r"[A-Za-z]:\\\S+").expect("win path regex"),
-        key: Regex::new(r"(sk|pk|ghp|gho|ghs|github_pat|xox[abpr]|AKIA)[\w\-]{8,}").expect("key"),
-        long_token: Regex::new(r"[A-Za-z0-9+/=_\-]{32,}").expect("token regex"),
-    })
-}
-
 fn is_bidi(c: char) -> bool {
     matches!(c, '\u{202A}'..='\u{202E}' | '\u{2066}'..='\u{2069}' | '\u{200E}' | '\u{200F}')
+}
+
+/// Remove ANSI escape sequences (CSI, OSC, and two-byte escapes).
+fn strip_ansi(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut it = s.chars().peekable();
+    while let Some(c) = it.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        match it.next() {
+            // CSI: parameters/intermediates until a final byte in @..=~.
+            Some('[') => {
+                for d in it.by_ref() {
+                    if ('@'..='~').contains(&d) {
+                        break;
+                    }
+                }
+            }
+            // OSC: until BEL or ESC \.
+            Some(']') => {
+                while let Some(d) = it.next() {
+                    if d == '\x07' {
+                        break;
+                    }
+                    if d == '\x1b' {
+                        it.next_if_eq(&'\\');
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }
 
 /// Remove ANSI escapes, bidi controls, and control characters other than
 /// newline and tab.
 pub fn strip_controls(s: &str) -> String {
-    let no_ansi = patterns().ansi.replace_all(s, "");
-    no_ansi
+    strip_ansi(s)
         .chars()
         .filter(|&c| c == '\n' || c == '\t' || !(c.is_control() || is_bidi(c)))
         .collect()
 }
 
-/// Training redaction: like `sanitize::clean` (URLs, emails, paths, keys per
-/// contract.md) but keeps newlines; keeps the last ≤ 4 KiB.
+/// Training redaction: `sanitize::redact_for_training` (same redactions as
+/// summaries, newlines kept) applied to the message ending, at most 4 KiB.
 pub fn redact_for_training(text: &str) -> String {
-    let p = patterns();
-    let s = strip_controls(text);
-    let s = p.url.replace_all(&s, "<url>");
-    let s = p.email.replace_all(&s, "<email>");
-    let s = p.path.replace_all(&s, "$1<path>");
-    let s = p.win_path.replace_all(&s, "<path>");
-    let s = p.key.replace_all(&s, "<redacted>");
-    let s = p.long_token.replace_all(&s, "<redacted>");
+    let chars: Vec<char> = text.chars().collect();
+    let tail: String = chars[chars.len().saturating_sub(TEXT_MAX_BYTES)..]
+        .iter()
+        .collect();
+    let s = crate::sanitize::redact_for_training(&strip_ansi(&tail), TEXT_MAX_BYTES);
     tail_bytes(&s, TEXT_MAX_BYTES).to_string()
 }
 
