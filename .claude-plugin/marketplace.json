@@ -1,0 +1,15 @@
+{
+  "name": "tap-on-shoulder",
+  "description": "Marketplace for the tap-on-shoulder Claude Code plugin",
+  "owner": {
+    "name": "karimQuant",
+    "url": "https://github.com/karimQuant"
+  },
+  "plugins": [
+    {
+      "name": "tap-on-shoulder",
+      "source": "./",
+      "description": "Taps you on the shoulder (an ntfy push) when a Claude Code session has been waiting on you for a while."
+    }
+  ]
+}

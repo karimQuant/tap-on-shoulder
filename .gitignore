@@ -23,6 +23,8 @@ model/data/raw/
 
 # Model artifacts are published as release assets, not committed
 model/artifacts/
+# Fetched by scripts/fetch-model.sh (pinned + checksummed), never committed
+assets/potion-base-8M/
 *.safetensors
 *.onnx
 

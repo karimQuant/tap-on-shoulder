@@ -1,0 +1,41 @@
+{
+  "description": "tap-on-shoulder: observes session events. Never blocks; prints nothing except a SessionStart warning.",
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["SessionStart"], "timeout": 5 } ] }
+    ],
+    "UserPromptSubmit": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["UserPromptSubmit"], "timeout": 5 } ] }
+    ],
+    "PreToolUse": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["PreToolUse"], "timeout": 5 } ] }
+    ],
+    "PostToolUse": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["PostToolUse"], "timeout": 5 } ] }
+    ],
+    "PostToolUseFailure": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["PostToolUseFailure"], "timeout": 5 } ] }
+    ],
+    "PermissionRequest": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["PermissionRequest"], "timeout": 5 } ] }
+    ],
+    "PermissionDenied": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["PermissionDenied"], "timeout": 5 } ] }
+    ],
+    "Notification": [
+      { "matcher": "permission_prompt|elicitation_dialog", "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["Notification"], "timeout": 5 } ] }
+    ],
+    "Stop": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["Stop"], "timeout": 5 } ] }
+    ],
+    "StopFailure": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["StopFailure"], "timeout": 5 } ] }
+    ],
+    "ElicitationResult": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["ElicitationResult"], "timeout": 5 } ] }
+    ],
+    "SessionEnd": [
+      { "hooks": [ { "type": "command", "command": "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh", "args": ["SessionEnd"], "timeout": 5 } ] }
+    ]
+  }
+}

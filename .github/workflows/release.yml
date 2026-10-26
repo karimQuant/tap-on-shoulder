@@ -1,0 +1,129 @@
+name: release
+# Builds the `tap` binary for every supported target with the model embedded,
+# attests build provenance, and (on a bin-v* tag push only) publishes a GitHub
+# PRERELEASE with the binaries and SHA256SUMS.
+#
+# Post-release runbook (manual, in order):
+#   1. For each asset, verify provenance before trusting it:
+#        gh release download bin-v<version> --repo karimQuant/tap-on-shoulder
+#        gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder
+#   2. Check SHA256SUMS against the downloaded files (sha256sum -c SHA256SUMS),
+#      then copy its lines into scripts/checksums.txt below `version=<version>`,
+#      and commit that change.
+#   3. Tag that commit `v<version>` (the plugin release the marketplace pins).
+on:
+  push:
+    tags: ["bin-v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and attest only; never publish"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-24.04, target: x86_64-unknown-linux-musl }
+          - { os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl }
+          - { os: macos-14, target: aarch64-apple-darwin }
+          # macos-13 has been retired by GitHub; macos-15-intel is the
+          # remaining native x86_64 macOS runner.
+          - { os: macos-15-intel, target: x86_64-apple-darwin }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    env:
+      TARGET: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: tag matches the pinned version
+        if: ${{ github.event_name == 'push' }}
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -eu
+          pinned=$(sed -n 's/^version=//p' scripts/checksums.txt | head -n 1)
+          crate=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)
+          test "${REF_NAME#bin-v}" = "$pinned"
+          test "$pinned" = "$crate"
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: musl toolchain
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          set -eu
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+          echo "CC_$(printf '%s' "$TARGET" | tr '-' '_')=musl-gcc" >>"$GITHUB_ENV"
+      - name: fetch pinned model
+        run: scripts/fetch-model.sh
+      - name: build
+        env:
+          TAP_REQUIRE_MODEL: embed
+        run: cargo build --release --locked --target "$TARGET"
+      - name: package
+        run: |
+          set -eu
+          mkdir -p dist
+          cp "target/$TARGET/release/tap" "dist/tap-$TARGET"
+          "./dist/tap-$TARGET" --version
+          if command -v sha256sum >/dev/null; then
+            (cd dist && sha256sum "tap-$TARGET") | tee -a "$GITHUB_STEP_SUMMARY"
+          else
+            (cd dist && shasum -a 256 "tap-$TARGET") | tee -a "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/tap-${{ matrix.target }}
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: tap-${{ matrix.target }}
+          path: dist/tap-${{ matrix.target }}
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    needs: build
+    # A tag push only; workflow_dispatch (dry run or not) never publishes.
+    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/bin-v') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: tap-*
+          path: dist
+          merge-multiple: true
+      - name: SHA256SUMS
+        run: |
+          set -eu
+          cd dist
+          set -- tap-*
+          test "$#" -eq 4
+          sha256sum tap-* >SHA256SUMS
+          cat SHA256SUMS | tee -a "$GITHUB_STEP_SUMMARY"
+      - uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
+        with:
+          prerelease: true
+          draft: false
+          fail_on_unmatched_files: true
+          files: |
+            dist/tap-*
+            dist/SHA256SUMS
