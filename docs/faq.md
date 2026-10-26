@@ -4,10 +4,10 @@
 No. It only sees the hook data Claude Code gives plugins. See [What it reads](security.md#what-it-reads).
 
 **Will a 20-minute test run trigger a false alarm?**
-No. A session that is still running a tool, or has background tasks running, is `working`, and that never starts a timer. The timer measures continuous *waiting*, not time since the last output.
+No. A session that is still running a tool, or has background tasks running, is `working`, and that never opens a waiting episode. The grace period measures continuous *waiting*, not time since the last output.
 
 **I replied after 4 minutes. Will I still get tapped?**
-No. Your reply closes the waiting episode. The timer wakes, sees that, and exits silently.
+No. Your reply closes the waiting episode. The pending tap is dropped silently.
 
 **Several sessions are waiting at once. What happens?**
 Each one gets its own notification, labelled with its project folder.
@@ -26,3 +26,9 @@ They're planned after v0.1. The notifier is pluggable. See the [roadmap](roadmap
 
 **Does it work in VS Code, over SSH, or in tmux?**
 The terminal CLI is the primary target. Other environments are on the list of things to test in [Verified interfaces](design/verified-interfaces.md#unverified).
+
+**I pressed Esc on a permission prompt and walked away, and later got a tap. Why?**
+Claude Code doesn't emit a hook event when you cancel or deny a permission prompt, so the plugin can't tell that you've already handled it. If you type anything afterwards, no tap is sent. This is a known limitation.
+
+**What if a permission prompt is approved and the tool then runs for 20 minutes?**
+Before tapping, the plugin checks whether the approved tool's process is running and postpones the tap while it is, for up to 10 minutes. Tools that run inside an existing process, such as some MCP calls, can't be detected and may cause one extra tap.

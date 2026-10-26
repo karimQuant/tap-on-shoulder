@@ -1,141 +1,130 @@
 # Architecture
 
-**Status:** draft for v0.1. Everything here is **Proposed** unless it links to [verified-interfaces.md](verified-interfaces.md).
+**Status:** v0.1 design, approved by consensus review. Exact types and formats live in [contract.md](contract.md). The Claude Code behaviour this design relies on was verified by spikes against Claude Code 2.1.310, listed in [verified-interfaces.md](verified-interfaces.md).
 
 ## Overview
 
 ```text
 Claude Code session ──hook JSON──▶ scripts/tap-hook.sh ──exec──▶ tap hook <Event>
+                                                                   │ (exits 0 in ms, never blocks Claude)
+                     ${CLAUDE_PLUGIN_DATA}/state/<session>.json ◀──┤ open / bind / re-arm / close episode
                                                                    │
-                     ${CLAUDE_PLUGIN_DATA}/state/<session>.json ◀──┤ open / update / close episode
-                                                                   │
-                                          (on open) spawn detached ▼
-                                                     tap wait <session> <episode>
-                                                         │ wall-clock loop
+                                   (if an episode is open) spawn ▼ (setsid, stdio → /dev/null)
+                                                     tap sweep   (one per machine, flock)
+                                                         │ sleep ≤ 5 s, wall clock
                                                          ▼
-                                      still same open, un-notified episode past due?
-                                                         │ yes
+                              same open episode, past due, session alive, tool not running?
+                                                         │ yes: claim → send once
                                                          ▼
-                                              ntfy HTTPS POST (once)
+                                                ntfy HTTPS POST (JSON body)
 ```
 
-There are no daemons and no hosted parts: one Rust binary (`tap`) plus one POSIX shell shim.
+There are no daemons and no hosted parts. The system is one Rust binary (`tap`) and one POSIX shell shim.
 
 ## Components
 
 | Component | Responsibility |
 |---|---|
-| `hooks/hooks.json` | Registers command hooks for the events below. All of them call the shim |
-| `scripts/tap-hook.sh` | Finds the verified binary and `exec`s it. If the binary is missing, it starts a background install and returns immediately |
-| `tap hook <Event>` | Reads hook JSON from stdin, applies the event mapping, updates state under a lock, and spawns the timer when needed. Must return in ≤ 20 ms at p95 |
-| `tap wait` | Detached per-episode timer. Wakes on wall-clock time, re-checks state, and sends at most once |
-| Classifier | Event rules first, then the embedded model (see [model.md](model.md)). Pure function: text and event in, category and summary out |
-| Notifier | `trait Notifier { fn send(&self, tap: &Tap) -> Result<()> }`. v0.1 implements ntfy only |
-| `tap setup / test / doctor / config check / label` | User-facing CLI |
+| `hooks/hooks.json` | Registers synchronous command hooks (never `async`). Every hook calls the shim |
+| `scripts/tap-hook.sh` | Resolves the verified binary and `exec`s it. If no binary is installed yet, it starts a background install and returns immediately |
+| `tap hook <Event>` | Parses the hook JSON, applies the event mapping under a per-session lock, and spawns the sweeper when an episode is open |
+| `tap sweep` | A single on-demand process. Delivers due episodes at most once, then exits when nothing is left open |
+| Classifier | Event rules, then the embedded model ([model.md](model.md)). Output is a category plus an extractive summary |
+| Notifier | `trait Notifier`. v0.1 implements ntfy |
+| CLI | `tap setup`, `test`, `doctor`, `label` |
 
 ## Event mapping
 
-<a id="event-mapping"></a>
+Bound episodes are tied to one tool call (`tool_use_id`). Unbound episodes come from the end of a turn.
 
-| Hook event (matcher) | Action |
+| Hook event | Action |
 |---|---|
-| `SessionStart` | Close any open episode for this session. Prune state older than 24 h. Warn the user if the binary is unavailable |
-| `UserPromptSubmit` | **Close** (the user responded) |
-| `PreToolUse` with `AskUserQuestion` or `ExitPlanMode` | **Open** `needs_decision`. The summary comes from the tool input (the question or plan title) |
-| `PreToolUse` with any other tool | **Close** (activity) |
-| `PostToolUse` / `PostToolUseFailure` | **Close** (activity; includes an answered `AskUserQuestion`) |
-| `Notification` with `permission_prompt` | **Open** `needs_permission`. The summary comes from `message` |
-| `Notification` with `elicitation_dialog` | **Open** `needs_decision` |
-| `PermissionDenied` | **Close** |
-| `Stop` with non-empty `background_tasks` | No episode. The session is still `working` |
-| `Stop` (otherwise) | Classify `last_assistant_message`, then **open** with the resulting category |
+| `SessionStart` | Close any open episode, clear `pending_tools`, and prune state older than 24 h. Print a `systemMessage` warning if tap-on-shoulder isn't configured |
+| `UserPromptSubmit` | **Close** the episode and clear `pending_tools`. The prompt text is never read |
+| `PreToolUse` with `AskUserQuestion` / `ExitPlanMode` | **Open** a **bound** `needs_decision` episode. The summary is the question |
+| `PreToolUse` with any other tool | Record a `pending_tools` entry `{id, name, input_hash}`. **Close** unbound episodes |
+| `PermissionRequest` | **Open** (or re-arm) a **bound** `needs_permission` episode. It binds to the pending entry with the same name and `input_hash`, falling back to the most recent entry with the same name |
+| `Notification` `permission_prompt` | Only sets `confirmed_at` |
+| `Notification` `elicitation_dialog` | **Open** `needs_decision` |
+| `PostToolUse` / `PostToolUseFailure` | Remove the pending entry. **Close** a bound episode only if its id matches. **Close** unbound episodes |
+| `PermissionDenied`, `ElicitationResult` | **Close** |
+| `Stop` with a `running` background task | No episode (the session is working; a new `Stop` arrives when the task finishes) |
+| `Stop` | Clear `pending_tools`. Classify `last_assistant_message`, then **open** an unbound episode with that category |
 | `StopFailure` | **Open** `blocked` |
-| `SessionEnd` | **Close** and delete the session's state |
+| `SessionEnd` | **Close** the episode and delete the session's state |
 
-Other events (`idle_prompt`, `SubagentStart/Stop`, and so on) are ignored. Events that come from inside a subagent (with `agent_id` set) count as activity for the parent session, so they can only **close** an episode. The one exception is `AskUserQuestion`, which still opens one.
+**Re-arm.** When an arming event arrives while an episode is already open, the episode keeps its `opened_at`. The category, summary, and binding are replaced only if the new event is bound or has a higher priority (`needs_permission` > `needs_decision` > `blocked` > `done` > `info`).
 
-**Re-arming:** if an arming event arrives while an episode is already open, the episode keeps its `opened_at` and `episode_id`. Only the category and summary are updated. Continuous waiting is measured from the first arming event, and only one timer runs.
+**Known gap.** Pressing Esc or choosing "No" at a permission prompt fires no hook event at all. If you then walk away without typing, you may still get one tap.
+
+## Sweeper and delivery
+
+- **Exclusivity.** `tap sweep` takes a non-blocking `flock` on `state/sweeper.lock`, so only one runs at a time. Any hook that leaves an open episode spawns it, and a duplicate exits immediately.
+- **Loop.** Scan every session file and sleep `min(earliest_due − now, 5 s)`.
+- **Shutdown.** When no episode is open, release the lock and **re-scan once**. Exit only if the second scan is also empty. This closes the race with a hook that opens an episode during shutdown.
+- **When an episode is due**, check in order:
+  1. **Session gone?** The recorded `claude` process (pid plus start time) has exited → close as `session_gone`.
+  2. **Permission tool running?** For `needs_permission`: a process descended from `claude` that started after `bound_at` is alive in two samples taken 2 s apart → postpone 30 s, up to a total of 10 minutes.
+  3. **Policy.** `done` and `info` taps are sent only if enabled. Otherwise the episode is closed as `suppressed`.
+  4. **Claim.** Under the session lock, move `open` → `sending{attempt}`.
+  5. **Send**, then record the result:
+
+     | Outcome | New state |
+     |---|---|
+     | Success | `notified` |
+     | Connect error | Back to `open`, retried with backoff (3 attempts) |
+     | Timeout after the request was written | `sent_uncertain` |
+
+  The result is written only if the episode is still `sending` with the same attempt. A close that lands during the send always wins.
+- **Stale claims.** A `sending` state older than 2 minutes becomes `sent_uncertain`. Delivery is **at most once**: we would rather lose a tap than send it twice.
 
 ## State
 
-Each session has one file: `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json`. The session ID is checked against `^[A-Za-z0-9_-]{1,128}$`, and anything else is rejected. Directory mode is 0700 and file mode 0600.
+There is one file per session, with the `SessionState` schema from [contract.md](contract.md#state-schema).
 
-```json
-{
-  "version": 1,
-  "session_id": "…",
-  "project": "payments-service",
-  "claude_pid": 12345,
-  "episode": {
-    "id": "01J…",
-    "status": "open | closed | notified | failed",
-    "category": "needs_decision",
-    "summary": "Keep the legacy column or drop it?",
-    "opened_at": 1761436800,
-    "due_at": 1761437100,
-    "timer_pid": 12399,
-    "attempts": 0
-  },
-  "updated_at": 1761436800
-}
-```
+- **Location and limits.** `${CLAUDE_PLUGIN_DATA}/state/<session_id>.json`, where `session_id` must match `^[A-Za-z0-9_-]{1,128}$`.
+- **Permissions.** Directories are 0700 and must be owned by the user. Files are 0600 and opened with `O_NOFOLLOW`.
+- **Writes.** A random temporary file created with `O_EXCL`, then `fsync`, then `rename`, all under an exclusive `flock` on `<session_id>.lock`.
+- **Never stored.** The full assistant message, and the user's prompts.
+- **Corrupt file.** The session is `unknown`: it is logged, it never taps, and it is replaced on the next arming event.
 
-- **Writes:** atomic (temporary file, `fsync`, `rename`) under an exclusive `flock` on `<session_id>.lock`. Hooks for the same session can run concurrently, so every read-modify-write holds the lock.
-- **Never stored:** the full assistant message. `summary` is already redacted.
-- **Corrupt or unreadable file:** the session is treated as `unknown`, the problem is logged, the file is replaced on the next arming event, and **no tap** is sent.
+## Configuration
 
-## Timer ownership
-
-- On **open**, `tap hook` spawns `tap wait <session> <episode_id>` in a new session (`setsid`), with stdio sent to `/dev/null`, and then returns. Hooks never wait for the timer.
-- **The loop:** read the state. Exit if the episode ID differs, or the status is not `open`. Otherwise `sleep(min(due_at − now, 30 s))` and repeat. Wall-clock checks make it safe across suspend and resume.
-- **When due:** take the lock, re-check, set `status = notified` (claim before send), release, and send.
-  - If the send fails, set `status = failed` and retry up to 3 times with backoff within 2 minutes.
-  - At-most-once wins over at-least-once: a crash between claiming and sending loses one tap rather than duplicating it.
-- **Session liveness:** at open, record the PID of the nearest ancestor process named `claude`, if one is found. At fire time, if that PID is gone, the episode is closed as `session_gone` and no tap is sent. If no ancestor was found, the check is skipped. **Unverified:** how Claude Code launches hook processes.
-- **After a reboot:** timers are gone, and so are the sessions. Stale state is pruned on the next `SessionStart`, and leftover episodes are never sent.
-
-## Configuration loading
-
-1. **User config:** `${XDG_CONFIG_HOME:-~/.config}/tap-on-shoulder/config.toml`, which may set every key.
-2. **Project config:** `<cwd>/.claude/tap-on-shoulder.toml` may set **only** `grace.*`, `alerts.*`, and `classifier.lean`. Any `notify.*`, `classifier.mode`, or `training.*` key in a project file is ignored with a warning. This stops a cloned repository from redirecting your notifications or enabling data collection.
-3. **Environment:** `TAP_GRACE_OVERRIDE` replaces every grace period (testing only). The ntfy token is read from the variable named in `token_env`.
+1. **User config** at `${XDG_CONFIG_HOME:-~/.config}/tap-on-shoulder/config.toml`. Every key is allowed.
+2. **Project config** at `<cwd>/.claude/tap-on-shoulder.toml`, at most 64 KiB. Only two kinds of key are honoured: `grace.*`, which can only *shorten* the user's value, and `alerts.completion`. Everything else is ignored with a warning. This means a cloned repository can't redirect notifications, hide taps, or turn on data collection.
+3. **Environment.** `TAP_GRACE_OVERRIDE` takes effect only when `TAP_DEV=1` is also set (testing only). The ntfy token is read from the environment variable named in `token_env`.
 
 ## Security boundaries
 
-- **Trust boundary:** hook stdin JSON (including `last_assistant_message` and tool input) is untrusted. It is parsed with `serde` into typed structs with size limits: stdin is capped at 1 MiB and messages are truncated to 16 KiB before classification.
-- **No shell interpolation:** session text is never placed in a command line, an environment variable, or a file path.
-- **Fixed outputs:** the classifier outputs an enum. The summary passes through `sanitize`, which removes control and bidi characters and URLs, redacts secrets, emails, and paths, and truncates to 80 characters.
-- **Network:** the only egress is the configured ntfy URL, over HTTPS, unless the user explicitly configures an `http://` server for localhost or a LAN. The HTTP client uses `rustls` and has a 10 s timeout.
-- **No exit code 2, ever:** `tap hook` always exits 0 and prints nothing to stdout, except for `SessionStart` warnings. It can never block, alter, or feed text into Claude.
+- **Untrusted input.** Hook stdin is untrusted. It is parsed with `serde` into typed structs and capped at 64 MiB. Messages are truncated to 16 KiB before classification.
+- **No session text in commands.** Session text never reaches a command line, an environment variable, a file path, an HTTP header, or the log.
+- **Classifier output.** An enum, plus a summary that is copied (never generated), sanitized, and redacted.
+- **Network egress.** Only the configured ntfy server, as a JSON POST over HTTPS:
+  - `http://` is allowed only for loopback, private-range, or `.local` hosts.
+  - Redirects are disabled and the timeout is 10 s.
+- **Exit status.** `tap hook` always exits 0, so it can never block or steer Claude.
 
 ## Install and distribution
 
-- **Plugin repo:** `.claude-plugin/plugin.json`, `.claude-plugin/marketplace.json`, `hooks/hooks.json`, `scripts/`, plus the Rust source.
-- **Binary releases:** release tags `bin-vX.Y.Z` build `tap` for `x86_64` and `aarch64` on Linux (musl) and macOS. The build attaches artifact attestations.
-- **Checksums:** `scripts/checksums.txt` pins the SHA-256 of every binary. It is committed **after** the binary release, and the plugin release tag `vX.Y.Z` points at that commit.
-- **First hook run:** the shim downloads the binary for the current platform into `${CLAUDE_PLUGIN_DATA}/bin/`, checks it against the pinned checksum, and moves it into place. This runs in the background behind a lock directory. A checksum mismatch deletes the download and logs an error.
-- **Development:** `TAP_BIN=/path/to/tap` skips the download.
-- **Model:** the model weights are embedded in the binary, so there is a single artifact with a single checksum.
+- **Release builds.** A `bin-v*` tag builds `tap` for x86_64 and aarch64 on Linux (musl) and macOS, using native runners. The model must be embedded (`TAP_REQUIRE_MODEL=embed`). Releases include build attestations and a `SHA256SUMS` file.
+- **Pinned checksums.** After the binary release, `scripts/checksums.txt` pins the version and the SHA-256 of each binary. The plugin release tag `vX.Y.Z` points at that commit.
+- **First hook run.** The shim downloads the binary for the platform into `${CLAUDE_PLUGIN_DATA}/bin/` and verifies the checksum, in the background and behind a lock. A mismatch deletes the download. During development, `TAP_BIN` overrides the binary.
 
 ## Observability
 
-- **Log:** `${CLAUDE_PLUGIN_DATA}/log/tap.log`, JSON lines, rotated at 1 MiB, 3 files kept. Each line records the event, the session (shortened ID), the episode ID, the transition, the category, and errors. Message text is **never** logged.
-- **`tap doctor`:** reports binary version and checksum, config validity and ignored keys, ntfy reachability (a HEAD request), currently open episodes with their due times, recent failures, and the classifier mode.
+- **Log.** `${CLAUDE_PLUGIN_DATA}/log/tap.log`, written as JSON lines and capped at 1 MiB. Each line records the event, a short session ID, the episode ID, the transition, the category, and an error *kind*. Message text is never logged.
+- **`tap doctor`.** Reports:
+  - version and model variant
+  - whether the config is valid, and which keys were ignored
+  - whether the ntfy server is reachable
+  - open episodes and their due times
+  - episodes in `failed` or `sent_uncertain`
+  - training-data cap warnings
 
-## Failure handling
+## Testing
 
-| Failure | Behaviour |
-|---|---|
-| Binary missing or unverified | The shim logs it and starts the background install. `SessionStart` shows a one-line warning. No taps until the install succeeds |
-| Model fails to load | Rules-only classification. Undecided `Stop` messages become `needs_decision` (the lean-alert default). Logged |
-| Config invalid | Built-in defaults are used, except ntfy: with no valid topic, nothing can be sent, so `doctor` and the `SessionStart` warning report it |
-| ntfy fails | Retried up to 3 times, then `failed`. Logged and shown in `doctor` |
-| State write fails (disk full, permissions) | Logged. The hook still exits 0, and the session is `unknown` |
-| Clock jumps | `due_at` is absolute wall-clock time. A backwards jump delays the tap, a forwards jump sends it early. Accepted |
-
-## Testing strategy
-
-- **Unit tests:** the event mapping, the classifier rules, `sanitize` and redaction, config precedence, and the at-most-once claim logic.
-- **Integration tests:** spawn the real binary with fixture hook JSON on stdin, `TAP_GRACE_OVERRIDE=1s`, a temporary `CLAUDE_PLUGIN_DATA`, and a local mock ntfy server. Each acceptance scenario in [product-spec.md](product-spec.md#acceptance-scenarios) has one test.
-- **Classifier parity:** the Rust inference matches the Python training pipeline on fixtures (absolute difference in probabilities < 1e-4).
-- **Manual end-to-end:** a script that runs a real `claude` session with the plugin loaded through `--plugin-dir` and a short grace period.
+| Suite | What it covers | Where it runs |
+|---|---|---|
+| `tests/scenarios_core.rs` | One named test per acceptance scenario, plus race, corruption, stdout, and log-content tests. Uses a mock ntfy server and `TAP_GRACE_OVERRIDE=1s` | |
+| `tests/scenarios_classifier.rs`, `tests/parity.rs` | Rules fallback, prompt-injection cases, and parity with the Python pipeline (identical token ids and labels, probability difference < 1e-3) | |
+| `scripts/e2e.sh` | A real interactive `claude` in tmux with the plugin loaded: one tap, no duplicate, no tap after `claude -p` exits | Local only |

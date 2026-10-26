@@ -56,6 +56,7 @@ The full reference is in [configuration.md](../configuration.md).
 | `alerts.info` | `false` | Tap on `info` |
 | `classifier.mode` | `model` | `rules` disables the embedded model |
 | `classifier.lean` | `alert` | When the model is uncertain, choose the category that taps |
+| Project config | — | `<repo>/.claude/tap-on-shoulder.toml` may only shorten `grace.*` and set `alerts.completion` |
 | `notify.ntfy.server` / `topic` / `token_env` | `https://ntfy.sh` / random / unset | **User config only.** A project config can never change these |
 | `notify.ntfy.privacy` | `summary` | `category-only` drops the summary |
 | `training.collect` | `false` | Opt-in. Stores redacted endings locally for labelling. See [model.md](model.md) |
@@ -65,10 +66,10 @@ The full reference is in [configuration.md](../configuration.md).
 1. An episode opens only on the arming events listed in [architecture.md](architecture.md#event-mapping).
 2. **Category grace:** a tap is due at `opened_at + grace[category]`. Waits classified as `done` or `info` use `grace.question`, and tap only if enabled.
 3. **At most one tap per episode.** The `notified` flag is set under a lock *before* sending. A failed send is retried at most 3 times within 2 minutes, then recorded as failed. It is never silently counted as delivered.
-4. **Cancellation:** any activity event for the session closes the episode. A newer turn produces a new `episode_id`, so a stale timer can never notify about a newer turn.
+4. **Cancellation:** any activity event for the session closes the episode. A newer turn produces a new `episode_id`, so a stale check can never notify about a newer turn.
 5. **Concurrent sessions:** every session is independent. There is no grouping in v0.1.
 6. **Unknown:** if state can't be determined (corrupt file, missing events), the session state is `unknown`. It is logged and shown in `tap doctor`, and it does **not** tap.
-7. **Fallback:** if the binary is unavailable, the shell shim sends a generic "a session is waiting" tap. That tap carries no message content and is still deduplicated per episode.
+7. **Binary missing:** no taps are sent until the background install succeeds. `SessionStart` shows a one-line warning, and `tap doctor` explains why.
 
 ## Notification content
 
@@ -83,12 +84,12 @@ The full reference is in [configuration.md](../configuration.md).
 |---|---|---|
 | 1 | Claude stops with a question and you don't respond | Exactly one tap after `grace.question`, naming the project and question |
 | 2 | You respond before the grace period ends | No tap |
-| 3 | Claude resumes (new activity) before the timer fires | The timer wakes, sees the episode closed or replaced, exits, and sends nothing |
+| 3 | Claude resumes (new activity) before the grace period ends | The sweeper sees the episode closed or replaced and sends nothing |
 | 4 | A tool runs silently for over 5 minutes | No tap (no arming event; activity events keep the session `working`) |
 | 5 | A task completes successfully | Tap only if `alerts.completion = true` |
 | 6 | A permission prompt appears | Tap after `grace.permission` unless it was approved or denied first |
 | 7 | Two sessions wait concurrently | Two taps, each with the correct project |
-| 8 | The timer process dies (reboot) or the plugin restarts mid-episode | No duplicate tap. On the next `SessionStart`, stale episodes are closed. A tap already sent is never sent again |
+| 8 | The sweeper process dies (reboot, OOM) or the plugin restarts mid-episode | No duplicate tap. On the next `SessionStart`, stale episodes are closed. A tap already sent is never sent again |
 | 9a | The embedded model fails to load | Rules-only classification, logged, shown in `tap doctor` |
 | 9b | ntfy is unreachable | Bounded retry, then recorded as failed and shown in `tap doctor` |
 | 10 | The final message contains instructions aimed at the classifier | The output is only a category label and an extractive summary. No other effect |

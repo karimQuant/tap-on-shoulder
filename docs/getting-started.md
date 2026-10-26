@@ -40,7 +40,7 @@ The first time a hook runs, the plugin downloads the `tap` binary for your platf
 tap setup
 ```
 
-This creates `~/.config/tap-on-shoulder/config.toml` with a **random** ntfy topic and prints a QR code. Scan it with the ntfy app to subscribe.
+This creates `~/.config/tap-on-shoulder/config.toml` with a **random** ntfy topic and prints the subscribe URL. Open that URL in a browser, or add the topic in the ntfy app.
 
 ## 3. Send a test tap
 

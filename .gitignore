@@ -36,3 +36,4 @@ __pycache__/
 .idea/
 .vscode/
 assets/potion-base-8M/
+.claude/worktrees/

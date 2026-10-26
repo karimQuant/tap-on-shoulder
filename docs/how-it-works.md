@@ -23,15 +23,16 @@ Claude Code runs the plugin's hooks on session events.
 
 If a `Stop` arrives while background tasks are still running, it doesn't open an episode. The session is still **working**.
 
-## 2. One timer per episode
+## 2. One sweeper for all sessions
 
-The hook writes a small state file and starts a detached sleeper process. There is no long-running daemon. When the sleeper wakes, it checks three things:
+When an episode opens, the hook writes a small state file and makes sure a single background process, `tap sweep`, is running. It is not a daemon: it exits as soon as nothing is waiting. Every few seconds it checks each open episode against four conditions:
 
-- Is it still the **same** episode? A newer turn creates a new episode ID.
-- Is the episode still **open**?
-- Has it **not** been notified yet?
+- Is the grace period over?
+- Is the episode still open? Any reply or new activity closes it, and a newer turn replaces it.
+- Is the Claude Code process for that session still running?
+- For a permission prompt: is it still unanswered? If the approved tool is already running, the tap is postponed.
 
-If any check fails, it exits silently. That one check handles cancellation, stale timers, and duplicate alerts.
+It sends only when all four hold, and it sends **at most once** per episode.
 
 ## 3. Local classification
 

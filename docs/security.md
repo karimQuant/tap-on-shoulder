@@ -51,7 +51,7 @@ It is an observer. The only outputs are a local log and one ntfy message per epi
 - One Rust binary with a deliberately small set of dependencies.
 - A short POSIX `sh` bootstrap script you can read in a minute. It downloads the binary and verifies the checksum.
 - Tagged releases, so the marketplace can be pinned to an exact version.
-- Signed or attested builds, such as GitHub artifact attestations, are a goal. We haven't committed to them yet.
+- Release builds carry GitHub artifact attestations. Check one with `gh attestation verify tap-<target> --repo karimQuant/tap-on-shoulder`.
 
 ## Plugin trust in general
 

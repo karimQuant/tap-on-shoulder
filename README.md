@@ -22,7 +22,7 @@ When a Claude Code session has been waiting for **you** for 5 minutes, you get *
 /plugin install tap-on-shoulder@tap-on-shoulder
 ```
 
-Then run `tap setup` and scan the QR code with the [ntfy](https://ntfy.sh) app. That's the whole setup. [Full guide →](docs/getting-started.md)
+Then run `tap setup` and subscribe to the printed topic in the [ntfy](https://ntfy.sh) app. That's the whole setup. [Full guide →](docs/getting-started.md)
 
 ## The result
 

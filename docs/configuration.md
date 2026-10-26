@@ -31,7 +31,7 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 ```
 
 > [!IMPORTANT]
-> **Project config is restricted.** A project file at `<repo>/.claude/tap-on-shoulder.toml` may only set `grace.*`, `alerts.*`, and `classifier.lean`. `notify.*`, `classifier.mode`, and `training.*` are ignored there, so a cloned repository can't redirect your notifications or turn on data collection.
+> **Project config is restricted.** A project file at `<repo>/.claude/tap-on-shoulder.toml` may only *shorten* `grace.*` values and set `alerts.completion`. Every other key is ignored with a warning, so a cloned repository can't redirect your notifications, hide taps, or turn on data collection.
 
 ## Reference
 
