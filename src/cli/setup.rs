@@ -9,14 +9,13 @@ use crate::notify;
 const TOPIC_RANDOM_CHARS: usize = 24;
 const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
 
-/// `tap-` followed by 24 random lowercase alphanumerics.
-pub fn random_topic() -> String {
+/// `tap-` followed by 24 random lowercase alphanumerics, or `None` if the
+/// OS random source fails. Never a shorter (guessable) topic.
+pub fn random_topic() -> Option<String> {
     let mut out = String::from("tap-");
     while out.len() < 4 + TOPIC_RANDOM_CHARS {
         let mut buf = [0u8; 32];
-        if getrandom::fill(&mut buf).is_err() {
-            break;
-        }
+        fill_random(&mut buf).ok()?;
         for b in buf {
             // Rejection sampling keeps the distribution uniform.
             if (b as usize) < 252 && out.len() < 4 + TOPIC_RANDOM_CHARS {
@@ -24,7 +23,23 @@ pub fn random_topic() -> String {
             }
         }
     }
-    out
+    Some(out)
+}
+
+/// `getrandom`, failing on demand under `TAP_TEST_GETRANDOM_FAIL=1` (debug
+/// builds with `TAP_DEV=1` only).
+fn fill_random(buf: &mut [u8]) -> Result<(), getrandom::Error> {
+    if config::test_knobs() && std::env::var("TAP_TEST_GETRANDOM_FAIL").as_deref() == Ok("1") {
+        return Err(getrandom::Error::UNSUPPORTED);
+    }
+    getrandom::fill(buf)
+}
+
+/// Exactly `tap-` plus 24 characters of the topic alphabet.
+fn topic_is_full(t: &str) -> bool {
+    t.len() == 4 + TOPIC_RANDOM_CHARS
+        && t.starts_with("tap-")
+        && t[4..].bytes().all(|b| ALPHABET.contains(&b))
 }
 
 pub fn config_text(server: &str, topic: &str) -> String {
@@ -111,7 +126,13 @@ pub fn run(args: &[String]) -> i32 {
             return 1;
         }
     }
-    let topic = random_topic();
+    let topic = match random_topic() {
+        Some(t) if topic_is_full(&t) => t,
+        _ => {
+            eprintln!("cannot generate a random topic: the OS random source failed");
+            return 1;
+        }
+    };
     if crate::state::write_atomic(&path, config_text(&server, &topic).as_bytes()).is_err() {
         eprintln!("cannot write {}", path.display());
         return 1;
@@ -128,12 +149,12 @@ mod tests {
 
     #[test]
     fn topic_shape() {
-        let t = random_topic();
+        let t = random_topic().unwrap();
         assert_eq!(t.len(), 28);
-        assert!(t.starts_with("tap-"));
-        assert!(t[4..].bytes().all(|b| ALPHABET.contains(&b)));
+        assert!(topic_is_full(&t));
         assert!(config::valid_topic(&t));
-        assert_ne!(t, random_topic());
+        assert_ne!(Some(t), random_topic());
+        assert!(!topic_is_full("tap-abc"));
     }
 
     #[test]
