@@ -1,0 +1,4 @@
+version=0.1.0-alpha.1
+# SHA-256 of each release binary, one "<sha256>  tap-<target>" line per target.
+# Empty until the first bin-v* release: copy the lines from that release's
+# SHA256SUMS after `gh attestation verify` passes (see .github/workflows/release.yml).

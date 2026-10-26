@@ -1,0 +1,12 @@
+{
+  "name": "tap-on-shoulder",
+  "version": "0.1.0-alpha.1",
+  "description": "Taps you on the shoulder (an ntfy push) when a Claude Code session has been waiting on you for a while. Observe-only: it never approves, types, or wakes Claude.",
+  "author": {
+    "name": "karimQuant",
+    "url": "https://github.com/karimQuant"
+  },
+  "homepage": "https://github.com/karimQuant/tap-on-shoulder",
+  "repository": "https://github.com/karimQuant/tap-on-shoulder",
+  "keywords": ["notifications", "ntfy", "hooks", "away-from-keyboard", "idle"]
+}

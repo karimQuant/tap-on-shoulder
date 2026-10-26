@@ -27,9 +27,10 @@ jobs:
           ./gitleaks git --redact --no-banner .
       - name: commit messages and authors carry no personal data
         run: scripts/check-commit-msg.sh --range HEAD
+      - name: tracked files carry no personal data
+        run: scripts/check-commit-msg.sh --files
 
   rust:
-    if: ${{ hashFiles('Cargo.toml') != '' }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
@@ -44,6 +45,23 @@ jobs:
       - run: cargo clippy --all-targets --locked -- -D warnings
       - run: cargo test --locked
 
+  # Builds with the embedded model and runs every suite, including the
+  # Rust/Python parity test.
+  model:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with: { toolchain: stable }
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      - name: fetch pinned model
+        run: scripts/fetch-model.sh
+      - name: test with the embedded model
+        env:
+          TAP_REQUIRE_MODEL: embed
+        run: cargo test --locked
+
   shell:
     runs-on: ubuntu-latest
     steps:
@@ -51,13 +69,37 @@ jobs:
         with: { persist-credentials: false }
       - name: shellcheck
         run: |
-          files=$(git ls-files '*.sh')
-          [ -z "$files" ] || shellcheck $files
+          git ls-files -z '*.sh' | xargs -0 -r shellcheck
 
   deny:
-    if: ${{ hashFiles('Cargo.lock') != '' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with: { persist-credentials: false }
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with: { persist-credentials: false }
+      - name: hooks.json invariants
+        run: |
+          set -eu
+          f=hooks/hooks.json
+          # No async (a hook must finish before Claude continues), and every
+          # hook is an exec-form call of the shim with a 5 s timeout.
+          jq -e '[.. | objects | has("async") or has("asyncRewake")] | any | not' "$f"
+          jq -e '[.hooks[][] .hooks[]
+                  | .type == "command"
+                    and .command == "${CLAUDE_PLUGIN_ROOT}/scripts/tap-hook.sh"
+                    and (.args | length == 1)
+                    and .timeout == 5]
+                 | all' "$f"
+          jq -e '[.hooks | to_entries[] | .key as $k | .value[].hooks[].args[0] == $k] | all' "$f"
+          test -x scripts/tap-hook.sh
+      - name: claude plugin validate (no credentials needed)
+        run: |
+          set -eu
+          npm install --global --no-fund --no-audit @anthropic-ai/claude-code@2.1.310
+          claude plugin validate --strict .

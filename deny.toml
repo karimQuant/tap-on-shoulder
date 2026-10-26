@@ -1,0 +1,42 @@
+# cargo-deny 0.20 configuration. Run: cargo deny check
+[graph]
+all-features = true
+
+[advisories]
+# Vulnerabilities are always denied in cargo-deny >= 0.16; unmaintained and
+# unsound advisories are reported for every crate in the graph.
+version = 2
+yanked = "deny"
+unmaintained = "all"
+unsound = "all"
+ignore = []
+
+[licenses]
+version = 2
+confidence-threshold = 0.93
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Zlib",
+    "CDLA-Permissive-2.0",
+]
+
+[licenses.private]
+# The workspace crate itself is unpublished and its licence is owner-gated.
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+allow-wildcard-paths = true
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []
