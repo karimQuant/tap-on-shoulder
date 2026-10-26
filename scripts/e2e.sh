@@ -8,7 +8,8 @@
 #
 # Scenario 1 (interactive, tmux): a prompt whose answer ends in a question
 #   -> exactly 1 POST within 40 s, containing the project dir name; then a reply
-#   asking for a plain statement -> no second POST within 8 s.
+#   that makes Claude finish with "All done." -> classified `done`, which is
+#   suppressed by default (alerts.completion = false) -> no second POST in 8 s.
 # Scenario 2 (claude -p): -> 0 new POSTs within 8 s (SessionEnd closes it).
 #
 # Isolation: the hook's CLAUDE_PLUGIN_DATA is set by Claude Code itself (S5),
@@ -167,7 +168,7 @@ pane() { tmux -L "$SOCK" capture-pane -p -t "$SESSION" 2>/dev/null || true; }
 trusted=0
 ready=0
 i=0
-while [ "$i" -lt 60 ]; do
+while [ "$i" -lt 180 ]; do  # up to 90 s: first start can install updates
   screen=$(pane)
   if printf '%s' "$screen" | grep -qi 'trust this folder'; then
     # Folder-trust dialog for the fresh scratch project: "No, exit" is
@@ -205,11 +206,11 @@ grep -qF -- "$PROJ_NAME" "$POSTS" || fail "the POST does not contain the project
 say "1 POST received after ~${i}s, with the project name"
 
 tmux -L "$SOCK" send-keys -t "$SESSION" -l \
-  'Blue. Do not use any tools. Reply with exactly one short sentence that states a fact and contains no question.'
+  'Blue. Do not use any tools. Reply with exactly these two words and nothing else: All done.'
 tmux -L "$SOCK" send-keys -t "$SESSION" C-m
 sleep "$QUIET_WAIT"
 n=$(posts)
-[ "$n" -eq 1 ] || fail "expected no second POST after the reply, got $n in total"
+[ "$n" -eq 1 ] || fail "expected no second POST after the reply (done is suppressed), got $n in total"
 say "no second POST after the reply"
 tmux -L "$SOCK" kill-server >/dev/null 2>&1 || true
 
