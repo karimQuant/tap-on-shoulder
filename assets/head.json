@@ -1,0 +1,4 @@
+{"version":1,"feature_spec":1,"variant":"features","dim":12,
+ "classes":["needs_decision","blocked","done","info"],
+ "W":[[0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0,0,0,0]],
+ "b":[0,0,0,0],"lean_threshold":0.25,"model_rev":"none","trained_on":{"synthetic":0,"real":0},"cv_macro_f1":0.0}
