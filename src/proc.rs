@@ -29,10 +29,10 @@ fn basename(s: &str) -> &str {
 
 /// The Claude process for this hook, if one can be identified.
 ///
-/// With `TAP_DEV=1`, `TAP_TEST_CLAUDE_PID=<pid>` injects the pid, and
-/// `TAP_TEST_CLAUDE_PID=none` disables detection.
+/// In debug builds with `TAP_DEV=1`, `TAP_TEST_CLAUDE_PID=<pid>` injects the
+/// pid, and `TAP_TEST_CLAUDE_PID=none` disables detection.
 pub fn detect_claude() -> Option<ProcId> {
-    if crate::config::dev() {
+    if crate::config::test_knobs() {
         if let Ok(v) = std::env::var("TAP_TEST_CLAUDE_PID") {
             return v.parse::<i32>().ok().and_then(identity);
         }

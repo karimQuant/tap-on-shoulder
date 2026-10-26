@@ -128,10 +128,16 @@ pub fn dev() -> bool {
     std::env::var("TAP_DEV").as_deref() == Ok("1")
 }
 
-/// `TAP_DEV=1` and `TAP_DEV_FAST=1`: shortens retry backoff and permission
-/// postponement so tests run in seconds.
+/// Test-only knobs (`TAP_DEV_FAST`, `TAP_TEST_*`): debug builds with `TAP_DEV=1`.
+/// Release binaries ignore them, so the environment cannot steer delivery.
+pub fn test_knobs() -> bool {
+    cfg!(debug_assertions) && dev()
+}
+
+/// `TAP_DEV_FAST=1`: shortens retry backoff and permission postponement so
+/// tests run in seconds.
 pub fn dev_fast() -> bool {
-    dev() && std::env::var("TAP_DEV_FAST").as_deref() == Ok("1")
+    test_knobs() && std::env::var("TAP_DEV_FAST").as_deref() == Ok("1")
 }
 
 pub fn user_config_path() -> Option<PathBuf> {

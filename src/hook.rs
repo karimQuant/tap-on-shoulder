@@ -508,9 +508,9 @@ fn classify(text: &str) -> Classification {
     crate::classify::load().classify(text)
 }
 
-/// `TAP_TEST_FORCE_CATEGORY=<category>` (tests only, requires `TAP_DEV=1`).
+/// `TAP_TEST_FORCE_CATEGORY=<category>` (debug builds with `TAP_DEV=1` only).
 fn forced_category() -> Option<Category> {
-    if !config::dev() {
+    if !config::test_knobs() {
         return None;
     }
     let v = std::env::var("TAP_TEST_FORCE_CATEGORY").ok()?;

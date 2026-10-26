@@ -6,7 +6,12 @@ use crate::contract::SUMMARY_MAX_CHARS;
 
 /// Extract and sanitize a ≤80-char summary from an assistant message.
 pub fn summary(text: &str) -> String {
-    clean(text.lines().rev().find(|l| !l.trim().is_empty()).unwrap_or(""))
+    clean(
+        text.lines()
+            .rev()
+            .find(|l| !l.trim().is_empty())
+            .unwrap_or(""),
+    )
 }
 
 /// Sanitize one line of untrusted text for display (no extraction).
