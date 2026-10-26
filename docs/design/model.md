@@ -78,5 +78,11 @@ python model/export.py                              # writes crates/tap/assets/h
 | `needs_decision` recall | ≥ 0.95 | ≥ 200 real, hand-labelled endings never used in training |
 | Macro-F1 | ≥ 0.85 | same |
 
+**Preview gate (synthetic):** `python model/train.py --report` must pass before a head ships. It runs grouped 5-fold CV on the synthetic set, using the lean-alert rule at the threshold stored in `head.json`, and checks two things:
+- **tap-recall ≥ 0.95:** true `needs_decision` and `blocked` rows predicted as either of those two classes.
+- **4-class macro-F1 ≥ 0.85.**
+
+Under the default settings, the visible outcome is binary: tap or no tap. Mixing up `done` and `info` has no effect anyone can see by default.
+
 - **Until the bar is met:** the model ships as *preview*, `lean = alert` stays the default, and the README says so.
 - **If the linear head can't reach the bar:** try the Ettin-32M encoder next.

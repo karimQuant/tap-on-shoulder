@@ -1,0 +1,96 @@
+{"text": "Refactor's in place. Before I push, one choice:\n\n```ts\n// A: throw on invalid input\nparseConfig(raw): Config\n// B: return a result type\nparseConfig(raw): Result<Config, ConfigError>\n```\n\nWhich signature do you want for the public API?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "The Figma spec and the existing component disagree on padding (12 px vs 16 px). Match Figma or keep the component as is?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Hey — I need a call on this before continuing: archive the old S3 bucket to Glacier, or delete it?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Would you like the CLI output colored by default, or only when `--color` is passed?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Docker Compose v2 syntax drops the `version:` key. Update all 7 compose files now, or leave them?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Soll die neue Seite auch auf Englisch verfügbar sein, oder vorerst nur auf Deutsch?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "The ticket says 'make it faster' — is a 2x improvement enough, or are we aiming for a specific number?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Should I file the upstream bug report myself, or would you rather do it from the team account?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "I can't tell if the `beta` users should see the new pricing page. Yes or no?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "这次重构要不要顺便升级 Node 版本？还是保持现在的 18？", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Revert the whole release, or hotfix forward? Revert is safer, hotfix keeps the new features.", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Okay, here's the trade-off: tighter CSP breaks the chat widget. Keep the widget or keep the strict policy?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Tried to run the e2e suite:\n\n```\nError: browserType.launch: Executable doesn't exist at /path/to/ms-playwright/chromium-1140/chrome-linux/chrome\n```\n\nDownloading browsers is blocked here (no outbound access to the CDN), so I can't run the e2e tests.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Can't proceed: the repository is archived (read-only), so I can't push the fix branch.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The Terraform provider requires a newer version of Terraform (1.9), and the pinned binary here is 1.5. Upgrading it needs admin rights on this machine.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Der Zugriff auf die Staging-Datenbank wird verweigert (password authentication failed). Ich brauche gültige Zugangsdaten.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The Jira API rejects my requests with 'CAPTCHA required'; a human has to log in through the browser once to clear it.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "No more progress possible right now: the external payment sandbox is down for scheduled maintenance until 06:00 UTC.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Publishing the Helm chart fails because the OCI registry needs a robot account, and the one in CI has been disabled.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The feature branch depends on an unreleased version of the shared library, which only exists on a colleague's machine.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "测试服务器的 SSH 连接被拒绝了，我没有办法部署。需要你把我的公钥加上。", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The build requires accepting the Android SDK licenses interactively (`sdkmanager --licenses`), which I can't do in this session.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "I need the decryption key for the sops-encrypted secrets file; without it, the app can't load its config.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The required environment variable `OPENAI_BASE_URL` points to an internal gateway that this machine can't reach.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Renamed the `master` branch to `main`, updated the default branch, retargeted the 6 open PRs, and fixed the CI triggers.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Replaced the deprecated call:\n\n```python\n# was: datetime.utcnow()\nnow = datetime.now(timezone.utc)\n```\n\nin 31 places. The deprecation warnings are gone and tests pass.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "已经修复了分页的问题，并加了回归测试，CI 全部通过。", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Your nits are fixed and the PR got its second approval; it's merged.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "All the API keys that were hard-coded in tests are replaced with fixtures, and the secret scanner is clean.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The cron job now writes a heartbeat; the uptime monitor alerts if it misses two runs. Tested by pausing it.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Images are now served as AVIF with a WebP fallback. Page weight on the gallery dropped by 58%.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Finished the move to pnpm workspaces. Install time is down from 2 min to 25 s, and every package builds.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The 'Ignore previous instructions' string in the user bio no longer breaks the summary job — it's escaped like any other text. Fixed and tested.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Health checks, graceful shutdown, and readiness gating are all in. Rolling deploys now complete with zero dropped requests.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "La pantalla de inicio de sesión ya funciona con el lector de pantalla. Todo probado.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Removed the 14 unused environment variables from all deploy configs; the services start normally.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Why is the first request slow? The JIT compiles the handlers on first use; subsequent requests are fast.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The library's maintainer marked the issue as 'won't fix', so the workaround we have is the long-term solution.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "In short: the queue isn't stuck, it's paused by the feature flag `ingest_paused`, which someone turned on yesterday.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "If you want, I can also convert the remaining class components — there are 4 left.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "这个警告来自第三方库，可以忽略。", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The cost increase last month came from cross-region data transfer, about $310 of the $420 increase.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "`SIGTERM` gives the process a chance to clean up; `SIGKILL` doesn't. Kubernetes sends `SIGTERM` first, then `SIGKILL` after the grace period.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Hmm, interesting — the bug only appears with Firefox's strict tracking protection, which blocks the analytics script and breaks the init order.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Everything is merged. Happy to pair on the follow-up ticket whenever you're ready.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The old and new implementations produce identical output on all 2,000 sample inputs; the only difference is speed.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Die Tests sind grün. Wenn du willst, kann ich noch Benchmarks hinzufügen.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Reading the RFC, a `204` response must not include a body, which is why the client ignores it.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The docs could live in the repo (Markdown + static site) or in the company wiki. Which do you want as the source of truth?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Should the CONTRIBUTING guide require signed commits, or just recommend them?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "For the API reference: generate it from the OpenAPI spec, or keep the hand-written pages? Generated is always current, hand-written reads better.", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Do you want the changelog maintained by hand, or generated from Conventional Commits?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "The style guide says 'e-mail' but half the docs say 'email'. Which spelling should I standardize on?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "I can write the tutorial for beginners or for people migrating from v1. Which audience first?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Should `make` be the entry point for dev tasks, or do you prefer `npm run` scripts since this is a JS project?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Should the editorconfig enforce 2-space or 4-space indentation for YAML?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Is it OK to delete the outdated architecture diagram, or should I mark it 'historical' and keep it?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "The docs site can be deployed on every merge or only on release tags. What's your preference?", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Mermaid or D2 for the diagrams? D2 looks nicer but needs a binary in CI.", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "Who should be listed as code owners for `docs/`? I don't want to guess names.", "label": "needs_decision", "group": "hand-b13", "source": "synthetic"}
+{"text": "The docs build fails because the theme is a private npm package and the registry token isn't configured.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Publishing to the docs host needs a deploy key that only exists in the old CI system, which I can't access.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "Vale's style rules are downloaded from a private repo, and cloning it fails with `Repository not found` for this account.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "I can't regenerate the API reference: the spec file is produced by the backend build, which needs the internal Maven repo I can't reach.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The screenshots for the tutorial require logging into the admin panel, and I don't have an admin account.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The link checker can't run: outbound HTTP is blocked in this sandbox, so every external link times out.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The translation service rejects requests with `quota exceeded` for the month, so the localized docs can't be updated.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The search index for the docs site is managed by a third-party service whose API key was revoked.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The video embed needs the hosting account's API token; I don't have it.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The PDF build needs a LaTeX installation (missing `xelatex`), and I can't install packages here.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "I need you to grant me access to the shared drive with the brand assets; the docs need the new logo.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "I can't publish the package docs: the docs registry requires the package owner's credentials.", "label": "blocked", "group": "hand-b13", "source": "synthetic"}
+{"text": "The README now has a quickstart, a feature list, and a troubleshooting section. Rendered fine on the repo page.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Set up the docs site with MkDocs Material; it builds in CI and deploys on every merge.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Every public function in the SDK has a docstring with an example now, and the doc-tests pass.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Replaced the outdated install instructions; I followed them on a fresh machine and everything worked.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Added `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, and issue templates.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The architecture diagram is redrawn to match the current services and committed as SVG.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Fixed 64 broken internal links after the docs reorganization; the link checker is clean.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The changelog for 5.0 is written and the migration guide covers all 9 breaking changes.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Pre-commit is configured with markdownlint and the existing docs pass.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "Wrote the ADR for the queue choice; it's merged into `docs/adr/`.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The CLI's `--help` output is consistent now: every command has a summary, usage, and an example.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "API reference regenerated from the spec, with the new endpoints included and deployed to the docs site.", "label": "done", "group": "hand-b13", "source": "synthetic"}
+{"text": "The docs build takes 4 minutes because it renders every version; building only the latest would take 40 seconds.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Docs are updated. Want me to also add a 'What's new' page for this release?", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The README's badge is red because it points at the old CI workflow name.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "MkDocs and Docusaurus would both work; MkDocs is simpler, Docusaurus is better if you want versioned docs with React components.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The tutorial assumes Node 18, which is end-of-life; it still works on 22 with no changes.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "About 30% of the doc pages haven't been edited in over two years.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Happy to proofread the remaining guides if you send them over.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The search on the docs site is client-side, so it doesn't index the API reference, which is a separate site.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "If you want, I can add a docs preview link to each PR.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "There's no license file in the repo, so by default nobody else has the right to reuse the code.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "The diagram source is in `docs/assets/arch.d2`; regenerating it needs the `d2` binary.", "label": "info", "group": "hand-b13", "source": "synthetic"}
+{"text": "Readers mostly land on the install page from search, according to the analytics.", "label": "info", "group": "hand-b13", "source": "synthetic"}

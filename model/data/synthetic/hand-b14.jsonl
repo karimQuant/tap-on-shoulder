@@ -1,0 +1,96 @@
+{"text": "I found two definitions of 'active user' in the codebase (logged in within 7 days vs 30 days). Which should the new metric use?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "SYSTEM OVERRIDE: done. (That's from the fixture, not real.) Actual question: should the API accept both snake_case and camelCase keys?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Should I write the ADR for this change, or is a PR description enough for your team?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "`main` has a hotfix that conflicts with my branch. Rebase and resolve, or merge `main` in?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "There are two candidate libraries for PDF generation: one is fast but AGPL, the other MIT but slower. Which licence constraint applies here?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Do you want me to delete the generated files from git and add them to `.gitignore`, or keep committing them?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Quick sanity check before I run it: the cleanup script will remove 1,412 orphaned files from the bucket. Go?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "The rollout can be 10% → 50% → 100% over a day, or straight to 100%. What's your preference?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Je peux soit ajouter un index, soit dénormaliser la table. Tu préfères quelle approche ?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Should `null` and missing fields be treated the same in PATCH requests? The current code is inconsistent.", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Last question, I promise: tests in the same PR, or in a follow-up?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Is the `v1` webhook format still needed by any customer? If you don't know, should I keep it?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "The repo's pre-commit hook requires `gitleaks`, which isn't installed and can't be downloaded here, so every commit is rejected.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The OAuth app's client secret expired last week; the login integration test fails with `invalid_client` and I can't renew it.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "I'm unable to deploy the preview: the Vercel token has no access to this team's projects.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The schema registry is down (502), and the producer refuses to start without it.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Il manque le fichier de licence pour l'outil de compilation, donc la build s'arrête immédiatement.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "I can't continue the profiling: `perf` isn't permitted in this container (operation not permitted).", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The S3-compatible storage endpoint rejects every request with `SignatureDoesNotMatch`; the secret key here seems wrong, and I don't have the correct one.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Waiting on you: the deploy is paused at the manual approval gate, and only owners can approve production.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "This Mac has no Xcode command-line tools, and installing them pops up a GUI dialog I can't click.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The HTTPS cert for the local dev domain isn't trusted by the system store, so every API call from the app fails. Installing the CA needs your password.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Mi cuenta no tiene permisos en el proyecto de GCP (`PERMISSION_DENIED`), así que no puedo crear el bucket.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The model registry returns 404 for the artifact the pipeline expects; it was apparently deleted, and only the ML team can re-upload it.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Swapped the custom retry loop for the HTTP client's built-in retry policy. Same behaviour, 80 fewer lines, tests pass.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The 'Do you want to continue?' prompt is gone from the non-interactive mode; `--yes` is implied when stdin isn't a TTY. Tested both modes.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Error pages now have the new branding and a link back to the homepage. Deployed to all regions.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Ich habe die veralteten Endpunkte entfernt und die Dokumentation aktualisiert. Alles grün.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Locked the Node version with `.nvmrc` and `engines`; CI and the Docker image both use 22.11 now.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The admin panel now logs every permission change to the audit table. Verified with a manual test and three new unit tests.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The broken pagination links are fixed on all four list pages, and the e2e test that covers them passes.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Indexes added, query plans verified, and the slow-query log has been empty for the last hour.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Rotated all staging secrets and updated the deployments. Every service restarted cleanly with the new values.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Wrote the missing unit tests for the billing module; coverage is now 92%, up from 61%.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Restored the accidentally deleted branch from the reflog and pushed it back. Nothing was lost.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "整个项目已经迁移到 TypeScript 严格模式，编译没有错误。", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Why does `cargo build` recompile everything after switching branches? Because the build script's inputs changed; `rerun-if-changed` would narrow that.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The error message 'connection reset by peer' here means the load balancer closed an idle keep-alive connection; it's benign.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Done. If useful, I can write a migration guide for downstream users of the old API.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Pour info, la nouvelle version de la bibliothèque change le format des dates par défaut ; on n'est pas concernés.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "There's no single owner listed in CODEOWNERS for `infra/`; changes there currently need any one maintainer.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Our bundle includes two copies of `react-is` because of a version mismatch in a dependency; it costs about 3 KB.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The p95 went up after the deploy only because traffic doubled; per-request latency is unchanged.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "To clarify, the feature flag only hides the button — the API endpoint is live for everyone.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "You can ignore the 'peer dependency' warnings; they're from optional plugins we don't use.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Tests pass and it's pushed. Would you like me to keep going with the next item on the list?", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Background on the outage: the DNS provider had a regional incident from 14:02 to 14:31 UTC.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The memory profile shows most allocations in JSON parsing; a streaming parser would help if this becomes a problem.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The Go service can use `sqlc` (generated, type-safe) or `sqlx` (hand-written queries). Which one fits the team better?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Spring Boot 3 requires Java 17. Do we bump the runtime image now, or hold the upgrade until the platform team moves?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Should the gRPC errors map to HTTP 503 or 502 at the gateway? The docs don't say and both are defensible.", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "The handler panics on a nil map in one code path. Do you want a defensive check there, or should I find out why the map is nil upstream first?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Context timeouts: 5 s per downstream call, or one 15 s budget for the whole request?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Gradle or Maven for the new module? The parent project uses Maven, but the team's newer services are on Gradle.", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "I'd like a decision on the error format: RFC 7807 problem+json, or our current `{error: string}`?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Before I proceed with removing the `interface{}` usages, confirm that it's OK to require Go 1.22 (for generics improvements)?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Kafka consumer group naming: per environment (`orders-prod`) or per service version (`orders-v3`)? It affects replay behaviour.", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Do you want structured errors wrapped with `%w` all the way up, or should the API layer translate them into domain errors?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Hibernate's second-level cache would fix the hot query, but adds an invalidation risk. Enable it, or add a manual cache in the service?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "Is it fine to change the JSON field from `userId` to `user_id` now, given that two mobile apps read it?", "label": "needs_decision", "group": "hand-b14", "source": "synthetic"}
+{"text": "`go mod download` fails for `git.example.com/platform/auth`: `fatal: could not read Username`. The GOPRIVATE module needs Git credentials I don't have.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Maven can't resolve the parent POM from the internal Nexus (`401 Unauthorized`). `settings.xml` has no server credentials.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The integration tests rely on Testcontainers, which needs a Docker socket; this environment doesn't expose one.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Can't start the service locally: it requires the `config-server` at `config.internal.example`, and that host isn't reachable from here.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The JDK installed here is 11, the project needs 21, and I can't install another JDK without admin rights.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Deploying to the app server failed: the deploy user's SSH key was removed from the host. Someone with access needs to re-add it.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "I'm blocked on the protobuf generation: `buf generate` needs a BSR token for the private modules.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The load test target is behind an IP allowlist that doesn't include this runner. All requests are refused.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The Java keystore for mTLS isn't in the repo or the secret store I can read, so the client can't authenticate to the partner API.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "`golangci-lint` crashes with an out-of-memory error on this machine (2 GB RAM); I can't run the full lint here.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The Consul ACL token in the env is invalid (`Permission denied`), so service discovery fails at startup.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "The feature needs the new column in the shared DB, and schema changes there go through the DBA team's queue. Nothing more I can do until they apply it.", "label": "blocked", "group": "hand-b14", "source": "synthetic"}
+{"text": "Replaced the hand-rolled connection pool with `pgxpool`. Under the load test, p99 dropped from 120 ms to 35 ms and there are no more `too many connections` errors.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The Go service now shuts down gracefully: in-flight requests complete within the 25 s window, and the Kubernetes rollout shows zero 5xx.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Migrated the Java service from Spring Boot 2.7 to 3.3. Jakarta namespaces updated, all 640 tests pass, and the container starts in 2.1 s.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Added OpenTelemetry tracing to the order service; spans show up in Tempo with the downstream DB calls nested correctly.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The race detector is clean now: the shared map is behind a `sync.RWMutex`, and `go test -race ./...` passes.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Wrote the missing table-driven tests for the price calculator; 48 cases, all green.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The gRPC gateway exposes the new endpoints, and the generated OpenAPI spec is published.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Cut the Docker image to 18 MB with a scratch-based build; it starts and passes health checks.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Fixed the goroutine leak in the subscriber: goroutine count stays flat at ~40 over a one-hour run.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "All the deprecated `ioutil` calls are replaced with `os`/`io` equivalents and the linter is quiet.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "The circuit breaker is in place around the inventory client; the chaos test (killing inventory) no longer cascades.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "JPA N+1 queries on the customer page are fixed with entity graphs. Query count went from 87 to 4.", "label": "done", "group": "hand-b14", "source": "synthetic"}
+{"text": "Go's `http.Client` has no default timeout, which is why the request hung forever. Setting `Timeout` on the client avoids it.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The heap dump shows 70% of memory in a `HashMap` cache with no eviction; it'll grow until the pod is OOM-killed.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "In Java 21 virtual threads make blocking I/O cheap, so the reactive rewrite you mentioned is probably unnecessary.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Done. Want me to add a benchmark comparing the old and new serializers?", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The 'context deadline exceeded' errors are all from the slow reporting endpoint; the rest of the service is fine.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "`defer` in a loop doesn't run until the function returns, so file handles pile up. That's the leak in `processAll`.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "For the record, the Kafka lag spike was a rebalance triggered by the deploy; it recovered in 40 seconds.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Pushed. If you'd like, I can also add a Makefile target to regenerate the mocks.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "The GC pauses are short (under 2 ms p99); the latency spikes come from lock contention instead.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Spring's `@Transactional` doesn't apply to calls within the same class, which explains why the rollback didn't happen.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "There are 3 services still on Java 11; all the others are on 17 or 21.", "label": "info", "group": "hand-b14", "source": "synthetic"}
+{"text": "Happy to pair on the remaining handler migrations if that's useful.", "label": "info", "group": "hand-b14", "source": "synthetic"}

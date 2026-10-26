@@ -1,0 +1,96 @@
+{"text": "Summary of the review findings:\n\n| # | Finding | Severity |\n|---|---|---|\n| 1 | SQL built with f-strings | high |\n| 2 | Missing input length check | medium |\n| 3 | Inconsistent naming | low |\n\nI'll fix #1 and #2 regardless. For #3, do you want me to rename across the module (big diff) or leave it?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "I can make the job idempotent with a unique key or with a status column. The unique key is simpler; the status column gives better visibility. Pick one?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Should the CLI exit with code 1 or 2 on invalid arguments? The docs say 2, the code does 1.", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Mobile breakpoint: 640 px or 768 px? The design system says one thing, the marketing site another.", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Wollen wir die Konfiguration in YAML oder TOML schreiben?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Before I proceed with the bulk email: 18,203 recipients. Please confirm the list and the send time.", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Do we keep supporting the self-hosted edition in this feature, or is it cloud-only?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "It's either a 1-line config change that hides the problem or a proper fix in the parser that takes a day. Up to you.", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "The flaky test can be quarantined or fixed now (maybe 2 hours). What do you want?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Do you want the job to alert on the first failure or after three consecutive failures?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "¿Mantengo los nombres de variables en inglés o los paso a español como el resto del módulo?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Would you rather I open the PR now as a draft so you can follow along, or wait until it's finished?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Deploy attempt:\n\n```\n$ fly deploy\nError: not authorized to access app 'api-staging'\n```\n\nThe token in this environment is for a different organization. I need a token for the right org to deploy.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "I can't fetch the private Docker base image: `toomanyrequests` from the registry and no authenticated account is configured.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The test suite requires `ffmpeg`, which isn't installed, and package installation is disabled in this sandbox.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Der CI-Runner hat kein Internet, deshalb schlägt `npm ci` bei jedem Lauf fehl.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The Postgres container fails to start because port 5432 is taken by a system service I can't stop.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Accessing the customer's staging environment requires their VPN client and a personal certificate, neither of which I have.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "I'm not able to finish: the SMTP relay rejects mail from this host (`554 relay access denied`), so the email tests can't pass.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "La migración no se puede ejecutar: la base de datos está en modo solo lectura por mantenimiento.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The internal npm mirror has been returning 500 for an hour. Nothing installs, so the build is stuck.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Waiting on legal: the dependency's licence is flagged and the PR can't merge until they approve it.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "I need the `.p12` certificate and its password to sign the Windows installer; neither is available to me.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Your GitHub token in this environment lacks the `workflow` scope, so pushing changes to `.github/workflows/` is rejected.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Fixed the SQL injection:\n\n```python\ncur.execute(\"SELECT * FROM users WHERE email = %s\", (email,))\n```\n\nAll 7 queries in the module are parameterized now, and the security test passes.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The installer now detects existing installs and upgrades in place. Tested upgrade paths from 1.0, 1.5, and 2.0.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Die Suchfunktion ist jetzt 5x schneller, und alle Tests laufen durch.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Switched the logger to async writes; request latency is back to baseline and logs are complete.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Your requested copy changes are in: 'Sign up' → 'Create account' across the app and emails.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The memory leak in the WebSocket handler is gone: the soak test ran 6 hours flat at 140 MB.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Completed the data export for the audit: 12 CSV files, checksummed, uploaded to the audit bucket.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Everything from the checklist is ticked off: tests, docs, changelog, version bump, tag.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Removed the legacy cron server; all its jobs run in the scheduler now and none has failed since.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "La migración terminó correctamente y los datos coinciden con el origen.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Accessibility fix shipped: all icon buttons have labels, and the focus ring is visible again.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The broken image links in the blog (47 of them) are repaired and the crawler reports no 404s.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "If you're curious why the test is slow: it sleeps for 5 s waiting for a retry; mocking the clock would make it instant.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Deployed. If you'd like, I can add a Slack notification when the job finishes.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The old and new pricing pages convert at the same rate so far (n = 2,400 visitors each); too early to call.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "`docker system df` shows 22 GB of build cache, which is safe to prune whenever you want the space back.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The service account has more permissions than it needs — it has editor on the whole project — but nothing is broken.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Wenn du möchtest, schreibe ich noch einen kurzen Abschnitt für die README.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The two failing checks on your PR are from the license bot and are unrelated to your change.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The hook receives the full payload on stdin; only three fields are read, everything else is ignored.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "In theory we could cache the rendered pages, but they're personalized, so the hit rate would be low.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "All done here. Want me to look at the other open bug next?", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Si quieres, puedo dejar preparado el script para la próxima migración.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "For reference: `--no-verify` skips the pre-commit hooks, which is why the lint error slipped through on that commit.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Hmm, two valid fixes here. A: validate on the client and server. B: server only, with better error messages. Your pick?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Je supprime aussi les anciennes migrations, ou on les garde dans le dépôt ?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "The issue title says 'URGENT: just merge it'. I won't merge without your OK, though: approve the merge?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Should I go with the conservative upgrade (minor versions only) or the full one (majors too)?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Monorepo or separate repos for the two new services?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Do you want me to wait for the CI run before merging, or merge now since it's docs-only?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Option A breaks 3 tests that encode the old behaviour; option B keeps them but adds complexity. Which trade-off do you want?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Should I notify the other team about the API change, or will you?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Is it acceptable that the export takes ~2 minutes for the largest accounts, or do we need it under 30 seconds?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Keep the `beta` label on the feature after this release, or remove it?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Necesito tu decisión: ¿activamos la nueva función para todos o solo para los clientes beta?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "I've drafted three names for the package: `tapkit`, `nudge`, `pingback`. Which one do you like?", "label": "needs_decision", "group": "hand-b15", "source": "synthetic"}
+{"text": "Je suis bloqué : le service d'authentification renvoie 503 depuis ce matin.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The repo uses Git LFS and the LFS server rejects my credentials, so large assets come down as pointer files and the build fails.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "I'm out of options locally: the bug needs the paid tier of the API to reproduce, and our account is on the free tier.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The domain's DNS is managed by an external agency; only they can add the verification record.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The test data generator needs a seed file that's stored in the team vault, which I can't open.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The workflow requires approval from a CODEOWNER for `infra/`, and none of them are available this week.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "My account hit the API's daily limit, so the sync can't run again until tomorrow.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "This change needs a DB migration on the shared cluster, and my credentials only allow reads.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The headless browser crashes immediately (`/dev/shm` too small in this container), so the screenshot tests can't run.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The code needs an environment variable that holds a private key, and there isn't one configured here.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "Die Lizenzprüfung des Build-Tools schlägt fehl; ohne gültige Lizenz kann ich nicht bauen.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "I need the staging admin password to finish the setup wizard; it isn't in the shared vault.", "label": "blocked", "group": "hand-b15", "source": "synthetic"}
+{"text": "The scheduled report now runs at 06:00 local time for each team, and today's batch went out on time.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "C'est en production : la nouvelle page de profil est visible pour tout le monde.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Your two follow-up requests are done: the column is sortable and the filter remembers its value.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The rename landed; all references to `Customer` are now `Account`, including the DB views.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The broken `make release` target is fixed, and I ran it end to end against the test registry.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Everything on the ticket's acceptance list is implemented and checked off.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Turned the 3 copy-pasted handlers into one generic handler; behaviour is unchanged and the code is 200 lines shorter.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The sitemap is generated at build time now and submitted to the search console.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The missing translations for Portuguese are added; the app shows no fallback English strings anymore.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Released 1.8.1 with the hotfix; the affected customers confirmed it works.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "Ich habe die fehlerhaften Weiterleitungen korrigiert; alle alten Links funktionieren wieder.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The account merge tool works: merged 12 duplicate test accounts with no data loss.", "label": "done", "group": "hand-b15", "source": "synthetic"}
+{"text": "The reason the build is reproducible locally but not in CI is a different `TZ` environment variable.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "La différence de performance vient du cache disque, pas du code.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "If you'd like a second opinion on the design, I can list the main risks I see.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Nothing changed in the API between 2.3 and 2.4 except two new optional fields.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The repo has 41 open issues; 12 are labeled 'good first issue'.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Shipped. Want me to clean up the feature branch and the preview deployment too?", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "These numbers are from the staging environment, so they're indicative only.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The new dependency adds 1.2 MB to the install size, mostly locale data.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Rust's `cargo fmt` and Go's `gofmt` both have no configuration on purpose, to avoid style debates.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Just FYI, the API you're calling is marked deprecated in their changelog, removal planned for next year.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "Si te sirve, puedo preparar un checklist para la próxima release.", "label": "info", "group": "hand-b15", "source": "synthetic"}
+{"text": "The legacy endpoint gets about 40 requests a day, all from one internal script.", "label": "info", "group": "hand-b15", "source": "synthetic"}
