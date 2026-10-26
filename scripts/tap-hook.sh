@@ -14,6 +14,12 @@
 # and exit 0. A hook never blocks, never exits non-zero, never waits on the
 # network.
 #
+# scripts/tap.sh (the slash-command and terminal wrapper) shares this logic:
+#   tap-hook.sh --resolve       print the usable binary path, or exit 1
+#   tap-hook.sh --install-now   install synchronously, messages on stderr;
+#                               exit 0 installed, 3 nothing pinned,
+#                               4 no CLAUDE_PLUGIN_DATA, 1 failed
+#
 # The install downloads the release asset for this platform into the data dir,
 # verifies it against the pinned checksum, chmod 0500, then renames it into
 # place. It never evals anything; every expansion is quoted.
@@ -42,7 +48,10 @@ esac
 BIN_DIR=$DATA/bin
 LOCK=$BIN_DIR/.install.lock
 
+NOW=0
+
 log() {
+  [ "$NOW" = 1 ] && printf 'tap: %s\n' "$*" >&2
   [ -n "$DATA" ] || return 0
   mkdir -p "$DATA/log" 2>/dev/null || return 0
   printf '%s install: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*" >>"$DATA/log/install.log" 2>/dev/null || true
@@ -91,10 +100,15 @@ pinned_sum() {
   printf '%s' "$found"
 }
 
+# Exit status: 0 installed (or nothing done in background mode), 3 nothing to
+# install (no pinned release, unsupported platform), 4 no data dir, 1 failure.
 install_binary() {
-  [ -n "$DATA" ] || exit 0
+  if [ -z "$DATA" ]; then
+    log "CLAUDE_PLUGIN_DATA is not set; nowhere to install"
+    exit 4
+  fi
   umask 077
-  mkdir -p "$BIN_DIR" "$DATA/log" || exit 0
+  mkdir -p "$BIN_DIR" "$DATA/log" || exit 1
 
   # Lock: mkdir is atomic. A lock older than 10 minutes is stale.
   if ! mkdir "$LOCK" 2>/dev/null; then
@@ -103,7 +117,8 @@ install_binary() {
       rm -rf -- "$LOCK"
       mkdir "$LOCK" 2>/dev/null || exit 0
     else
-      exit 0
+      log "another install is running; try again in a minute"
+      exit 1
     fi
   fi
   tmp=
@@ -111,26 +126,27 @@ install_binary() {
   trap 'exit 1' HUP INT TERM
 
   # At most one attempt per 10 minutes, so a missing release is not retried
-  # (and logged) on every hook.
+  # (and logged) on every hook. An explicit --install-now skips the throttle.
   stamp=$BIN_DIR/.install.attempt
-  if [ -e "$stamp" ] && [ -z "$(find "$stamp" -mmin +10 2>/dev/null)" ]; then
+  if [ "$NOW" != 1 ] && [ -e "$stamp" ] &&
+    [ -z "$(find "$stamp" -mmin +10 2>/dev/null)" ]; then
     exit 0
   fi
   : >"$stamp"
 
   if [ -z "$VERSION" ]; then
     log "no release pinned (checksums.txt has no version line)"
-    exit 0
+    exit 3
   fi
   if ! target=$(detect_target); then
     log "unsupported platform: $(uname -s 2>/dev/null) $(uname -m 2>/dev/null)"
-    exit 0
+    exit 3
   fi
   asset=tap-$target
   expected=$(pinned_sum "$asset")
   if [ -z "$expected" ]; then
     log "no release pinned for $asset at version $VERSION"
-    exit 0
+    exit 3
   fi
 
   dest=$BIN_DIR/tap-$VERSION
@@ -165,21 +181,34 @@ install_binary() {
   exit 0
 }
 
-if [ "${1:-}" = "--install" ]; then
-  install_binary
-fi
+resolve_bin() {
+  bin=
+  if [ -n "${TAP_BIN:-}" ] && [ -x "$TAP_BIN" ]; then
+    bin=$TAP_BIN
+  elif [ -n "$DATA" ] && [ -n "$VERSION" ] && [ -x "$BIN_DIR/tap-$VERSION" ] &&
+    [ -f "$BIN_DIR/tap-$VERSION.verified" ]; then
+    bin=$BIN_DIR/tap-$VERSION
+  elif [ "${TAP_DEV:-}" = "1" ] && [ -x "$ROOT/target/release/tap" ]; then
+    bin=$ROOT/target/release/tap
+  fi
+}
+
+case ${1:-} in
+  --install) install_binary ;;
+  --install-now)
+    NOW=1
+    install_binary
+    ;;
+  --resolve)
+    resolve_bin
+    [ -n "$bin" ] || exit 1
+    printf '%s\n' "$bin"
+    exit 0
+    ;;
+esac
 
 event=${1:-}
-
-bin=
-if [ -n "${TAP_BIN:-}" ] && [ -x "$TAP_BIN" ]; then
-  bin=$TAP_BIN
-elif [ -n "$DATA" ] && [ -n "$VERSION" ] && [ -x "$BIN_DIR/tap-$VERSION" ] &&
-  [ -f "$BIN_DIR/tap-$VERSION.verified" ]; then
-  bin=$BIN_DIR/tap-$VERSION
-elif [ "${TAP_DEV:-}" = "1" ] && [ -x "$ROOT/target/release/tap" ]; then
-  bin=$ROOT/target/release/tap
-fi
+resolve_bin
 
 if [ -n "$bin" ]; then
   [ -n "$event" ] || exit 0
