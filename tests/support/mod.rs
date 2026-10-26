@@ -279,8 +279,13 @@ impl TestEnv {
     }
 
     pub fn hook_raw(&self, event: &str, stdin: &[u8]) -> Output {
+        self.run_stdin(&["hook", event], stdin)
+    }
+
+    /// Run `tap <args>` with `stdin` piped in.
+    pub fn run_stdin(&self, args: &[&str], stdin: &[u8]) -> Output {
         let mut child = self
-            .command(&["hook", event])
+            .command(args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

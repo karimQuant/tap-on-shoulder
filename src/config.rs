@@ -23,6 +23,22 @@ pub enum Privacy {
     CategoryOnly,
 }
 
+/// `classifier.mode`: `model` uses the embedded head when the build has one
+/// (else the rules); `rules` always uses the rules classifier.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ClassifierMode {
+    Model,
+    Rules,
+}
+
+/// `classifier.lean`: `alert` applies head.json's `lean_threshold`;
+/// `balanced` is plain argmax over the head's probabilities.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Lean {
+    Alert,
+    Balanced,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Ntfy {
     pub server: String,
@@ -43,8 +59,8 @@ pub struct Config {
     pub grace: Grace,
     pub alerts_completion: bool,
     pub alerts_info: bool,
-    pub classifier_mode: String,
-    pub classifier_lean: String,
+    pub classifier_mode: ClassifierMode,
+    pub classifier_lean: Lean,
     pub ntfy: Ntfy,
     pub training_collect: bool,
 }
@@ -59,8 +75,8 @@ impl Default for Config {
             },
             alerts_completion: false,
             alerts_info: false,
-            classifier_mode: "model".into(),
-            classifier_lean: "alert".into(),
+            classifier_mode: ClassifierMode::Model,
+            classifier_lean: Lean::Alert,
             ntfy: Ntfy {
                 server: DEFAULT_SERVER.into(),
                 topic: None,
@@ -292,11 +308,13 @@ fn apply_user(out: &mut Loaded, t: &toml::Table) {
                 }
             }
             "classifier.mode" => match v.as_str() {
-                Some(m @ ("model" | "rules")) => c.classifier_mode = m.into(),
+                Some("model") => c.classifier_mode = ClassifierMode::Model,
+                Some("rules") => c.classifier_mode = ClassifierMode::Rules,
                 _ => bad(&mut out.errors, "expected \"model\" or \"rules\""),
             },
             "classifier.lean" => match v.as_str() {
-                Some(m @ ("alert" | "balanced")) => c.classifier_lean = m.into(),
+                Some("alert") => c.classifier_lean = Lean::Alert,
+                Some("balanced") => c.classifier_lean = Lean::Balanced,
                 _ => bad(&mut out.errors, "expected \"alert\" or \"balanced\""),
             },
             "notify.ntfy.server" => match v.as_str() {
@@ -454,5 +472,34 @@ mod tests {
         assert_eq!(l.config.ntfy.privacy, Privacy::CategoryOnly);
         assert_eq!(l.errors.len(), 1);
         assert_eq!(l.warnings.len(), 1);
+    }
+
+    #[test]
+    fn classifier_keys_user_only() {
+        let mut l = Loaded::default();
+        assert_eq!(l.config.classifier_mode, ClassifierMode::Model);
+        assert_eq!(l.config.classifier_lean, Lean::Alert);
+        let t: toml::Table =
+            toml::from_str("[classifier]\nmode = \"rules\"\nlean = \"balanced\"\n").unwrap();
+        apply_user(&mut l, &t);
+        assert_eq!(l.config.classifier_mode, ClassifierMode::Rules);
+        assert_eq!(l.config.classifier_lean, Lean::Balanced);
+        assert!(l.errors.is_empty());
+
+        let t: toml::Table = toml::from_str("[classifier]\nmode = \"x\"\n").unwrap();
+        apply_user(&mut l, &t);
+        assert_eq!(l.errors.len(), 1);
+
+        let mut l = Loaded::default();
+        let dir =
+            std::env::temp_dir().join(format!("tap-cfg-unit-{}", crate::state::random_hex(6)));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("p.toml");
+        std::fs::write(&p, "[classifier]\nmode = \"rules\"\nlean = \"balanced\"\n").unwrap();
+        apply_project_file(&mut l, &p);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(l.config.classifier_mode, ClassifierMode::Model);
+        assert_eq!(l.config.classifier_lean, Lean::Alert);
+        assert_eq!(l.warnings.len(), 2);
     }
 }

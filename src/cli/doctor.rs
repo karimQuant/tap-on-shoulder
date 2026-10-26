@@ -1,6 +1,7 @@
 //! `tap doctor`: version, model variant, config validity and ignored keys,
 //! ntfy reachability, open episodes, failed and uncertain deliveries, and the
-//! training-file cap. Exit 1 if there is no topic or the config is invalid.
+//! training-file cap. Exit 1 if there is no topic, the config is invalid, or
+//! the ntfy server is refused or unreachable.
 
 use std::time::Duration;
 
@@ -32,6 +33,7 @@ pub fn run() -> i32 {
         fail = true;
     }
     let c = &loaded.config;
+    report_classifier(c);
     println!(
         "grace: question {}s, permission {}s, blocked {}s; alerts: completion {}, info {}",
         c.grace.question, c.grace.permission, c.grace.blocked, c.alerts_completion, c.alerts_info
@@ -54,7 +56,10 @@ pub fn run() -> i32 {
             let agent = notify::agent(HEAD_TIMEOUT);
             match agent.head(&url).call() {
                 Ok(r) => println!("ntfy: reachable (HTTP {})", r.status().as_u16()),
-                Err(_) => println!("ntfy: UNREACHABLE"),
+                Err(_) => {
+                    println!("ntfy: UNREACHABLE (taps cannot be delivered)");
+                    fail = true;
+                }
             }
         }
     }
@@ -70,6 +75,35 @@ pub fn run() -> i32 {
         1
     } else {
         0
+    }
+}
+
+/// The user's classifier settings, the classifier they select, and the
+/// embedded head's decision threshold and recorded CV metrics.
+fn report_classifier(c: &crate::config::Config) {
+    use crate::config::{ClassifierMode, Lean};
+    let mode = match c.classifier_mode {
+        ClassifierMode::Model => "model",
+        ClassifierMode::Rules => "rules",
+    };
+    let lean = match c.classifier_lean {
+        Lean::Alert => "alert",
+        Lean::Balanced => "balanced",
+    };
+    let in_use = crate::classify::load_with(c.classifier_mode, c.classifier_lean).variant();
+    println!("classifier: mode {mode}, lean {lean} (in use: {in_use})");
+    match serde_json::from_str::<crate::contract::Head>(crate::classify::head::HEAD_JSON) {
+        Ok(h) => {
+            let mut line = format!("head: {} lean_threshold {}", h.variant, h.lean_threshold);
+            if let Some(r) = h.cv_tap_recall {
+                line.push_str(&format!(", cv_tap_recall {r}"));
+            }
+            if let Some(f) = h.cv_macro_f1 {
+                line.push_str(&format!(", cv_macro_f1 {f}"));
+            }
+            println!("{line}");
+        }
+        Err(_) => println!("head: unreadable"),
     }
 }
 

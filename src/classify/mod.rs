@@ -14,47 +14,72 @@ pub mod rules;
 mod unicode_tables;
 pub mod wordpiece;
 
+pub use crate::config::{ClassifierMode, Lean};
 use crate::contract::{Classification, Classifier, EMBED_DIM};
 use head::{LinearHead, Variant};
 
 pub use rules::RulesClassifier;
 
-/// Best available classifier for this build. Honors `TAP_FORCE_NO_MODEL=1`
-/// (tests) by returning the rules-only classifier.
+/// Best available classifier with the default settings
+/// (`classifier.mode = "model"`, `classifier.lean = "alert"`).
 pub fn load() -> Box<dyn Classifier + Send + Sync> {
-    if std::env::var("TAP_FORCE_NO_MODEL").as_deref() == Ok("1") {
+    load_with(ClassifierMode::Model, Lean::Alert)
+}
+
+/// The classifier for the user's `classifier.mode` and `classifier.lean`.
+/// `Rules` (or `TAP_FORCE_NO_MODEL=1`, used by tests) returns the rules-only
+/// classifier; `Model` returns the head-based classifier when the build has
+/// one, else the rules. `lean` only affects head-based classifiers.
+pub fn load_with(mode: ClassifierMode, lean: Lean) -> Box<dyn Classifier + Send + Sync> {
+    if mode == ClassifierMode::Rules || std::env::var("TAP_FORCE_NO_MODEL").as_deref() == Ok("1") {
         return Box::new(RulesClassifier);
     }
-    load_model().unwrap_or_else(|| Box::new(RulesClassifier))
+    load_model(lean).unwrap_or_else(|| Box::new(RulesClassifier))
 }
 
 /// The head-based classifier for this build, ignoring `TAP_FORCE_NO_MODEL`:
 /// `embed` when the model is embedded and the head is `embed`, `features`
 /// when the head is `features` and trained, otherwise `None`.
-pub fn load_model() -> Option<Box<dyn Classifier + Send + Sync>> {
+pub fn load_model(lean: Lean) -> Option<Box<dyn Classifier + Send + Sync>> {
     let head = LinearHead::embedded().ok()?;
     if head.variant == Variant::Features && !head.is_trained() {
         return None;
     }
-    with_head(head)
+    with_head_lean(head, lean)
+}
+
+/// A classifier for an arbitrary validated head with `lean = "alert"`.
+pub fn with_head(head: LinearHead) -> Option<Box<dyn Classifier + Send + Sync>> {
+    with_head_lean(head, Lean::Alert)
 }
 
 /// A classifier for an arbitrary validated head: `embed` heads need the
-/// embedded model (else `None`), `features` heads always work.
-pub fn with_head(head: LinearHead) -> Option<Box<dyn Classifier + Send + Sync>> {
+/// embedded model (else `None`), `features` heads always work. `Alert` uses
+/// the head's `lean_threshold`; `Balanced` uses plain argmax.
+pub fn with_head_lean(head: LinearHead, lean: Lean) -> Option<Box<dyn Classifier + Send + Sync>> {
+    let threshold = match lean {
+        Lean::Alert => Some(head.lean_threshold),
+        Lean::Balanced => None,
+    };
     match head.variant {
-        Variant::Embed => embed_classifier(head),
-        Variant::Features => Some(Box::new(FeaturesClassifier { head })),
+        Variant::Embed => embed_classifier(head, threshold),
+        Variant::Features => Some(Box::new(FeaturesClassifier { head, threshold })),
     }
 }
 
 #[cfg(has_model)]
-fn embed_classifier(head: LinearHead) -> Option<Box<dyn Classifier + Send + Sync>> {
-    Some(Box::new(EmbedClassifier { head }))
+fn embed_classifier(
+    head: LinearHead,
+    threshold: Option<f32>,
+) -> Option<Box<dyn Classifier + Send + Sync>> {
+    Some(Box::new(EmbedClassifier { head, threshold }))
 }
 
 #[cfg(not(has_model))]
-fn embed_classifier(_head: LinearHead) -> Option<Box<dyn Classifier + Send + Sync>> {
+fn embed_classifier(
+    _head: LinearHead,
+    _threshold: Option<f32>,
+) -> Option<Box<dyn Classifier + Send + Sync>> {
     None
 }
 
@@ -145,14 +170,14 @@ pub fn head_input(message: &str, variant: Variant) -> Option<Vec<f32>> {
     }
 }
 
-fn classify_with(head: &LinearHead, message: &str) -> Classification {
+fn classify_with(head: &LinearHead, threshold: Option<f32>, message: &str) -> Classification {
     let text = features::prepare_text(message);
     let summary = crate::sanitize::summary(text);
     match head_input(text, head.variant) {
         Some(x) => {
             let p = head.probs(&x);
             Classification {
-                category: head::decide(&p, Some(head.lean_threshold)),
+                category: head::decide(&p, threshold),
                 summary,
                 probs: Some(p),
             }
@@ -165,14 +190,16 @@ fn classify_with(head: &LinearHead, message: &str) -> Classification {
     }
 }
 
-/// Logistic head over the 12 hand features (option D).
+/// Logistic head over the 12 hand features (option D). `threshold` is the
+/// lean-alert threshold, or `None` for plain argmax.
 pub struct FeaturesClassifier {
     pub head: LinearHead,
+    pub threshold: Option<f32>,
 }
 
 impl Classifier for FeaturesClassifier {
     fn classify(&self, text: &str) -> Classification {
-        classify_with(&self.head, text)
+        classify_with(&self.head, self.threshold, text)
     }
 
     fn variant(&self) -> &'static str {
@@ -184,15 +211,61 @@ impl Classifier for FeaturesClassifier {
 #[cfg(has_model)]
 pub struct EmbedClassifier {
     pub head: LinearHead,
+    pub threshold: Option<f32>,
 }
 
 #[cfg(has_model)]
 impl Classifier for EmbedClassifier {
     fn classify(&self, text: &str) -> Classification {
-        classify_with(&self.head, text)
+        classify_with(&self.head, self.threshold, text)
     }
 
     fn variant(&self) -> &'static str {
         "embed"
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::contract::Category;
+
+    /// A features head whose probabilities are `p` for every input
+    /// (zero weights, log-probability biases).
+    fn constant_head(p: [f32; 4], lean_threshold: f32) -> LinearHead {
+        LinearHead {
+            variant: Variant::Features,
+            w: vec![vec![0.0; head::DIM_FEATURES]; 4],
+            b: p.map(f32::ln),
+            lean_threshold,
+        }
+    }
+
+    #[test]
+    fn mode_rules_forces_rules_classifier() {
+        for lean in [Lean::Alert, Lean::Balanced] {
+            let c = load_with(ClassifierMode::Rules, lean);
+            assert_eq!(c.variant(), "rules");
+            assert!(c.classify("Should I use A or B?").probs.is_none());
+        }
+    }
+
+    #[test]
+    fn lean_alert_vs_balanced() {
+        // p0 + p1 = 0.27 ≥ 0.25, but `done` is the argmax.
+        let p = [0.15, 0.12, 0.6, 0.13];
+        let alert = with_head_lean(constant_head(p, 0.25), Lean::Alert).unwrap();
+        let balanced = with_head_lean(constant_head(p, 0.25), Lean::Balanced).unwrap();
+        let a = alert.classify("All tests pass.");
+        let b = balanced.classify("All tests pass.");
+        assert_eq!(a.category, Category::NeedsDecision);
+        assert_eq!(b.category, Category::Done);
+        assert_eq!(a.probs, b.probs);
+        // `with_head` defaults to alert.
+        let d = with_head(constant_head(p, 0.25)).unwrap();
+        assert_eq!(
+            d.classify("All tests pass.").category,
+            Category::NeedsDecision
+        );
     }
 }

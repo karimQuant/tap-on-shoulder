@@ -1,4 +1,5 @@
-//! User-facing commands: `setup`, `test`, `doctor`, `label`, `--version`.
+//! User-facing commands: `setup`, `test`, `doctor`, `label`, `classify`,
+//! `--version`.
 
 pub mod doctor;
 pub mod setup;
@@ -7,12 +8,25 @@ pub mod training;
 use crate::contract::{Notifier, Tap, FEATURE_SPEC};
 use crate::notify::NtfyNotifier;
 
-/// `tap --version`.
+/// Shown next to a head-based model variant: the shipped head is a preview.
+pub const MODEL_PREVIEW_NOTE: &str = "preview: trained on synthetic data; see docs/design/model.md";
+
+/// `model: <variant>` with the preview note for head-based variants.
+pub fn model_line(variant: &str) -> String {
+    if variant == "rules" {
+        format!("model: {variant}")
+    } else {
+        format!("model: {variant} ({MODEL_PREVIEW_NOTE})")
+    }
+}
+
+/// `tap --version`. Reports the build's best classifier (default settings).
 pub fn version_text() -> String {
     let variant = crate::classify::load().variant();
     format!(
-        "tap {}\nmodel: {variant}\nfeature_spec: {FEATURE_SPEC}\n",
-        env!("CARGO_PKG_VERSION")
+        "tap {}\n{}\nfeature_spec: {FEATURE_SPEC}\n",
+        env!("CARGO_PKG_VERSION"),
+        model_line(variant)
     )
 }
 
@@ -83,7 +97,9 @@ pub fn classify_stdin() -> i32 {
         return 2;
     }
     let text = String::from_utf8_lossy(&buf);
-    let classifier = crate::classify::load();
+    // `classifier.*` are user-only keys, so the project file is irrelevant.
+    let cfg = crate::config::load(None).config;
+    let classifier = crate::classify::load_with(cfg.classifier_mode, cfg.classifier_lean);
     let c = classifier.classify(&text);
     println!("category: {}", c.category.as_str());
     println!("summary:  {}", c.summary);

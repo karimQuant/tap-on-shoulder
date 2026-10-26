@@ -106,8 +106,11 @@ pub struct Head {
     pub model_rev: String,
     #[serde(default)]
     pub trained_on: serde_json::Value,
+    /// Grouped-CV macro-F1 and tap recall recorded by `model/train.py`.
     #[serde(default)]
-    pub cv_macro_f1: f32,
+    pub cv_macro_f1: Option<f32>,
+    #[serde(default)]
+    pub cv_tap_recall: Option<f32>,
 }
 
 /// One entry of `tests/fixtures/parity.json`.

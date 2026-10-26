@@ -566,6 +566,11 @@ fn s09b_ntfy_unreachable_failed() {
     let text = String::from_utf8_lossy(&doctor.stdout);
     assert!(text.contains("failed"), "{text}");
     assert!(text.contains("UNREACHABLE"), "{text}");
+    assert_eq!(
+        doctor.status.code(),
+        Some(1),
+        "unreachable ntfy fails doctor"
+    );
 
     assert!(eventually(secs(5.0), || status(&e500, "s09s") == "failed"));
     assert_eq!(episode(&e500, "s09s")["closed_reason"], "http_status");
@@ -984,16 +989,40 @@ fn cli_setup_doctor_version() {
     assert!(text.starts_with("tap "));
     assert!(text.contains("model: "));
     assert!(text.contains("feature_spec: 1"));
+    if !text.contains("model: rules") {
+        assert!(
+            text.contains("(preview: trained on synthetic data; see docs/design/model.md)"),
+            "{text}"
+        );
+    }
 
     // Valid config: doctor exits 0 and reaches the mock with HEAD.
     let d = env.run(&["doctor"]);
-    assert_eq!(
-        d.status.code(),
-        Some(0),
-        "{}",
-        String::from_utf8_lossy(&d.stdout)
-    );
+    let dtext = String::from_utf8_lossy(&d.stdout);
+    assert_eq!(d.status.code(), Some(0), "{dtext}");
     assert!(mock.requests().iter().any(|r| r.method == "HEAD"));
+    assert!(dtext.contains("lean_threshold 0.35"), "{dtext}");
+    assert!(dtext.contains("cv_tap_recall "), "{dtext}");
+    assert!(dtext.contains("cv_macro_f1 "), "{dtext}");
+    assert!(
+        dtext.contains("classifier: mode model, lean alert"),
+        "{dtext}"
+    );
+
+    // classifier.mode = "rules" is honoured by doctor and `tap classify`.
+    let rules = env_for(&mock.url);
+    let cfg = std::fs::read_to_string(rules.config_dir().join("config.toml")).unwrap();
+    rules.write_user_config(&format!(
+        "{cfg}\n[classifier]\nmode = \"rules\"\nlean = \"balanced\"\n"
+    ));
+    let d = rules.run(&["doctor"]);
+    let dtext = String::from_utf8_lossy(&d.stdout);
+    assert!(
+        dtext.contains("classifier: mode rules, lean balanced (in use: rules)"),
+        "{dtext}"
+    );
+    let c = rules.run_stdin(&["classify"], b"Should I use A or B?");
+    assert!(String::from_utf8_lossy(&c.stdout).contains("(rules)"));
 
     // `tap test` sends one tap.
     assert!(env.run(&["test"]).status.success());
