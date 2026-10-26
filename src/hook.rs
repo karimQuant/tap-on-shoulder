@@ -46,12 +46,18 @@ fn event_name(name: &str) -> Option<&'static str> {
     })
 }
 
+/// Per-session lock wait. Well under Claude Code's 5 s hook timeout.
+const LOCK_WAIT: Duration = Duration::from_secs(2);
+
 /// Entry point. Returns what to print on stdout (usually nothing).
 pub fn run(arg_event: &str) -> Option<String> {
     let event = event_name(arg_event).unwrap_or("unknown");
-    let Some(input) = read_input() else {
-        Entry::new(event).kind("bad_input").write();
-        return None;
+    let input = match read_input() {
+        Ok(i) => i,
+        Err(kind) => {
+            Entry::new(event).kind(kind).write();
+            return None;
+        }
     };
     let Some(event) = event_name(&input.hook_event_name) else {
         Entry::new("unknown").kind("unknown_event").write();
@@ -64,17 +70,18 @@ pub fn run(arg_event: &str) -> Option<String> {
     handle(event, &input)
 }
 
-fn read_input() -> Option<HookInput> {
+/// Read and parse stdin. Errors are log kinds: `oversize` or `bad_input`.
+fn read_input() -> Result<HookInput, &'static str> {
     let mut buf = Vec::new();
     std::io::stdin()
         .lock()
         .take(STDIN_MAX_BYTES as u64 + 1)
         .read_to_end(&mut buf)
-        .ok()?;
+        .map_err(|_| "bad_input")?;
     if buf.len() > STDIN_MAX_BYTES {
-        return None;
+        return Err("oversize");
     }
-    serde_json::from_slice(&buf).ok()
+    serde_json::from_slice(&buf).map_err(|_| "bad_input")
 }
 
 /// Canonical JSON: object keys sorted recursively, compact separators.
@@ -172,10 +179,87 @@ enum Kind {
 
 const ELICITATION_TRIGGER: &str = "Notification:elicitation_dialog";
 
+/// What a bound episode is tied to (plan R3).
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Binding {
+    /// One exact tool call.
+    Id(String),
+    /// Several pending calls of the same tool; any of them may be the one
+    /// waiting on the prompt. Sorted.
+    Candidates(Vec<String>),
+    /// No pending call of the tool was known: bound by tool name.
+    Name(String),
+}
+
+fn binding_of(ep: &Episode) -> Option<Binding> {
+    if let Some(id) = &ep.tool_use_id {
+        Some(Binding::Id(id.clone()))
+    } else if !ep.candidate_ids.is_empty() {
+        let mut c = ep.candidate_ids.clone();
+        c.sort();
+        Some(Binding::Candidates(c))
+    } else {
+        ep.bound_tool_name.clone().map(Binding::Name)
+    }
+}
+
+fn set_binding(ep: &mut Episode, b: Option<Binding>) {
+    ep.tool_use_id = None;
+    ep.candidate_ids.clear();
+    ep.bound_tool_name = None;
+    match b {
+        Some(Binding::Id(id)) => ep.tool_use_id = Some(id),
+        Some(Binding::Candidates(c)) => ep.candidate_ids = c,
+        Some(Binding::Name(n)) => ep.bound_tool_name = Some(n),
+        None => {}
+    }
+}
+
+/// The tool name a bound episode waits on, as far as it is known.
+fn bound_tool(ep: &Episode, pending: &[PendingTool]) -> Option<String> {
+    let name_of = |id: &str| {
+        pending
+            .iter()
+            .find(|t| t.tool_use_id == id)
+            .map(|t| t.tool_name.clone())
+    };
+    match binding_of(ep)? {
+        Binding::Id(id) => name_of(&id),
+        Binding::Candidates(c) => c.iter().find_map(|id| name_of(id)),
+        Binding::Name(n) => Some(n),
+    }
+}
+
+/// `PermissionRequest` binding: the pending call with the same name and
+/// input hash; else the only pending call with that name; else all of them
+/// (ambiguous); else the tool name alone.
+fn bind_permission(pending: &[PendingTool], tool: &str, hash: &str) -> Binding {
+    if let Some(t) = pending
+        .iter()
+        .rev()
+        .find(|t| t.tool_name == tool && t.input_hash == hash)
+    {
+        return Binding::Id(t.tool_use_id.clone());
+    }
+    let mut same: Vec<String> = pending
+        .iter()
+        .filter(|t| t.tool_name == tool)
+        .map(|t| t.tool_use_id.clone())
+        .collect();
+    match same.len() {
+        0 => Binding::Name(tool.to_string()),
+        1 => Binding::Id(same.remove(0)),
+        _ => {
+            same.sort();
+            Binding::Candidates(same)
+        }
+    }
+}
+
 fn kind_of(ep: &Episode) -> Kind {
     if ep.trigger == ELICITATION_TRIGGER {
         Kind::Elicitation
-    } else if ep.tool_use_id.is_some() {
+    } else if binding_of(ep).is_some() {
         Kind::Bound
     } else {
         Kind::Unbound
@@ -228,34 +312,55 @@ impl Ctx<'_> {
     }
 
     /// Open or re-arm (plan R3).
-    fn arm(&mut self, category: Category, summary: String, trigger: &str, tool: Option<String>) {
-        let bound = tool.is_some() || trigger == ELICITATION_TRIGGER;
+    ///
+    /// A bound re-arm whose binding differs from the current one is a new
+    /// prompt (the previous one was answered), so its timers start fresh.
+    fn arm(
+        &mut self,
+        category: Category,
+        summary: String,
+        trigger: &str,
+        binding: Option<Binding>,
+    ) {
+        let bound = binding.is_some() || trigger == ELICITATION_TRIGGER;
         let now = self.now;
         let sid = self.state.session_id.clone();
         let transition;
         if let Some(ep) = self.state.episode.as_mut().filter(|e| e.status.is_open()) {
+            let rebind = match (&binding, binding_of(ep)) {
+                (Some(new), Some(cur)) => *new != cur,
+                _ => false,
+            };
+            if rebind {
+                ep.opened_at = now;
+                ep.postponed_s = 0;
+                ep.confirmed_at = None;
+                ep.retry_at = None;
+            }
             if bound || category.priority() > ep.category.priority() {
                 ep.category = category;
                 ep.summary = summary;
                 ep.trigger = trigger.to_string();
                 if bound {
-                    ep.tool_use_id = tool;
+                    set_binding(ep, binding);
                     ep.bound_at = Some(now);
                 }
             }
             ep.due_at = ep.opened_at + self.cfg.grace_for(ep.category) as i64;
-            transition = "rearmed";
+            transition = if rebind { "rebound" } else { "rearmed" };
         } else {
             let grace = self.cfg.grace_for(category) as i64;
-            self.state.episode = Some(Episode {
+            let mut ep = Episode {
                 id: state::random_hex(8),
                 status: EpisodeStatus::Open,
                 category,
                 summary,
                 trigger: trigger.to_string(),
-                bound_at: tool.as_ref().map(|_| now),
-                tool_use_id: tool,
+                tool_use_id: None,
+                candidate_ids: Vec::new(),
+                bound_tool_name: None,
                 opened_at: now,
+                bound_at: binding.as_ref().map(|_| now),
                 due_at: now + grace,
                 confirmed_at: None,
                 attempts: 0,
@@ -263,8 +368,19 @@ impl Ctx<'_> {
                 sending_since: None,
                 postponed_s: 0,
                 closed_reason: None,
-            });
-            self.state.claude = crate::proc::detect_claude();
+            };
+            set_binding(&mut ep, binding);
+            self.state.episode = Some(ep);
+            // Detect Claude once per session (slow on macOS), and again only
+            // when the recorded process is gone.
+            let known = self
+                .state
+                .claude
+                .as_ref()
+                .is_some_and(crate::proc::same_process);
+            if !known {
+                self.state.claude = crate::proc::detect_claude();
+            }
             transition = "opened";
         }
         self.changed = true;
@@ -299,9 +415,17 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
             return session_start_warning(event, input);
         }
     };
-    let Ok(_lock) = store.lock(sid) else {
-        Entry::new(event).session(sid).kind("lock").write();
-        return None;
+    let _lock = match store.lock_timeout(sid, LOCK_WAIT) {
+        Ok(l) => l,
+        Err(e) => {
+            let kind = if e.kind() == std::io::ErrorKind::TimedOut {
+                "lock_timeout"
+            } else {
+                "lock"
+            };
+            Entry::new(event).session(sid).kind(kind).write();
+            return None;
+        }
     };
 
     if event == "SessionEnd" {
@@ -375,17 +499,32 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
                 ctx.changed = true;
                 if is_decision_tool(&tool) {
                     let summary = decision_summary(&tool, input.tool_input.as_ref());
-                    ctx.arm(Category::NeedsDecision, summary, "PreToolUse", Some(id));
+                    ctx.arm(
+                        Category::NeedsDecision,
+                        summary,
+                        "PreToolUse",
+                        Some(Binding::Id(id)),
+                    );
                 }
             }
         }
         "PostToolUse" | "PostToolUseFailure" => {
             let id = input.tool_use_id.clone().unwrap_or_default();
+            let tool = input.tool_name.clone().unwrap_or_default();
             let before = ctx.state.pending_tools.len();
             ctx.state.pending_tools.retain(|t| t.tool_use_id != id);
             ctx.changed |= before != ctx.state.pending_tools.len();
+            let pending = ctx.state.pending_tools.clone();
             ctx.close_if("tool_done", |e| match kind_of(e) {
-                Kind::Bound => e.tool_use_id.as_deref() == Some(id.as_str()),
+                Kind::Bound => match binding_of(e) {
+                    Some(Binding::Id(b)) => b == id,
+                    // Only once no candidate is still pending.
+                    Some(Binding::Candidates(c)) => !c
+                        .iter()
+                        .any(|x| pending.iter().any(|t| &t.tool_use_id == x)),
+                    Some(Binding::Name(n)) => n == tool,
+                    None => false,
+                },
                 Kind::Unbound => true,
                 Kind::Elicitation => false,
             });
@@ -393,13 +532,7 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
         "PermissionRequest" => {
             let tool = input.tool_name.clone().unwrap_or_default();
             let hash = input_hash(input.tool_input.as_ref());
-            let pending = &ctx.state.pending_tools;
-            let bound = pending
-                .iter()
-                .rev()
-                .find(|t| t.tool_name == tool && t.input_hash == hash)
-                .or_else(|| pending.iter().rev().find(|t| t.tool_name == tool))
-                .map(|t| t.tool_use_id.clone());
+            let bound = bind_permission(&ctx.state.pending_tools, &tool, &hash);
             let (category, summary) = if is_decision_tool(&tool) {
                 (
                     Category::NeedsDecision,
@@ -411,10 +544,18 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
                     format!("wants to use {}", crate::sanitize::clean(&tool)),
                 )
             };
-            ctx.arm(category, summary, "PermissionRequest", bound);
+            ctx.arm(category, summary, "PermissionRequest", Some(bound));
         }
         "PermissionDenied" => {
-            ctx.close_if("permission_denied", |e| kind_of(e) != Kind::Elicitation);
+            // A bound episode closes only for its own tool: denying a
+            // parallel call leaves the visible prompt waiting.
+            let tool = input.tool_name.clone().unwrap_or_default();
+            let pending = ctx.state.pending_tools.clone();
+            ctx.close_if("permission_denied", |e| match kind_of(e) {
+                Kind::Bound => bound_tool(e, &pending).is_some_and(|n| n == tool),
+                Kind::Unbound => true,
+                Kind::Elicitation => false,
+            });
         }
         "Notification" => match input.notification_type.as_deref() {
             Some("permission_prompt") => {
@@ -443,18 +584,22 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
                 .background_tasks
                 .as_ref()
                 .is_some_and(|b| b.iter().any(|t| t.status == "running"));
-            if running {
+            let text = truncate_chars(input.last_assistant_message.as_deref().unwrap_or(""));
+            let mut c = classify(text);
+            if let Some(forced) = forced_category() {
+                c.category = forced;
+            }
+            // With background work running, `done` and `info` mean "still
+            // working" (a new Stop arrives when it finishes); a question or a
+            // blocker still needs the user.
+            let working = matches!(c.category, Category::Done | Category::Info);
+            if running && working {
                 ctx.close_if("background_task", |e| kind_of(e) == Kind::Unbound);
                 Entry::new(event)
                     .session(sid)
                     .kind("background_running")
                     .write();
             } else {
-                let text = truncate_chars(input.last_assistant_message.as_deref().unwrap_or(""));
-                let mut c = classify(text);
-                if let Some(forced) = forced_category() {
-                    c.category = forced;
-                }
                 ctx.arm(c.category, c.summary.clone(), "Stop", None);
                 if cfg.training_collect {
                     crate::cli::training::collect(sid, text, &c);

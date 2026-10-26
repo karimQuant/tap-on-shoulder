@@ -35,38 +35,43 @@ There are no daemons and no hosted parts. The system is one Rust binary (`tap`) 
 
 ## Event mapping
 
-Bound episodes are tied to one tool call (`tool_use_id`). Unbound episodes come from the end of a turn.
+Bound episodes are tied to a tool: one call (`tool_use_id`), a set of candidate calls (`candidate_ids`), or a tool name (`bound_tool_name`). Unbound episodes come from the end of a turn.
 
 | Hook event | Action |
 |---|---|
-| `SessionStart` | Close any open episode, clear `pending_tools`, and prune state older than 24 h. Print a `systemMessage` warning if tap-on-shoulder isn't configured |
+| `SessionStart` | Close any open episode, clear `pending_tools`, and prune state older than 24 h. A `.lock` file is deleted only if its `.json` is gone and the lock is older than 24 h. Print a `systemMessage` warning if tap-on-shoulder isn't configured |
 | `UserPromptSubmit` | **Close** the episode and clear `pending_tools`. The prompt text is never read |
 | `PreToolUse` with `AskUserQuestion` / `ExitPlanMode` | **Open** a **bound** `needs_decision` episode. The summary is the question |
 | `PreToolUse` with any other tool | Record a `pending_tools` entry `{id, name, input_hash}`. **Close** unbound episodes |
-| `PermissionRequest` | **Open** (or re-arm) a **bound** `needs_permission` episode. It binds to the pending entry with the same name and `input_hash`, falling back to the most recent entry with the same name |
+| `PermissionRequest` | **Open** (or re-arm) a **bound** `needs_permission` episode. It binds to the pending entry with the same name and `input_hash`. Without one, it binds to the only pending entry with that name; to the **set** of them if there are several (`candidate_ids`, `tool_use_id` empty); or to the tool name if there are none (`bound_tool_name`) |
 | `Notification` `permission_prompt` | Only sets `confirmed_at` |
 | `Notification` `elicitation_dialog` | **Open** `needs_decision` |
-| `PostToolUse` / `PostToolUseFailure` | Remove the pending entry. **Close** a bound episode only if its id matches. **Close** unbound episodes |
-| `PermissionDenied`, `ElicitationResult` | **Close** |
-| `Stop` with a `running` background task | No episode (the session is working; a new `Stop` arrives when the task finishes) |
+| `PostToolUse` / `PostToolUseFailure` | Remove the pending entry. **Close** a bound episode only if its id matches; for a candidate set, only once no candidate is still pending; for a tool name, only if the name matches. **Close** unbound episodes |
+| `PermissionDenied` | **Close** a bound episode only if `tool_name` is its tool (the bound call's pending entry, the candidates' name, or `bound_tool_name`). **Close** unbound episodes |
+| `ElicitationResult` | **Close** an `elicitation_dialog` episode |
 | `Stop` | Clear `pending_tools`. Classify `last_assistant_message`, then **open** an unbound episode with that category |
+| `Stop` with a `running` background task | Classify as above. `needs_decision` and `blocked` **open** as usual. `done` and `info` mean the session is still working: no episode (a new `Stop` arrives when the task finishes) |
 | `StopFailure` | **Open** `blocked` |
 | `SessionEnd` | **Close** the episode and delete the session's state |
 
 **Re-arm.** When an arming event arrives while an episode is already open, the episode keeps its `opened_at`. The category, summary, and binding are replaced only if the new event is bound or has a higher priority (`needs_permission` > `needs_decision` > `blocked` > `done` > `info`).
 
+**Rebinding.** A bound re-arm (`PermissionRequest`, `AskUserQuestion`) whose binding differs from the episode's current binding is a new prompt, so the previous one was answered. The episode starts fresh: `opened_at` and `bound_at` become now, `due_at` is now plus the grace, `postponed_s` is 0, and `confirmed_at` and `retry_at` are cleared. The same binding keeps the plain re-arm behaviour.
+
+**Hook lock.** A hook waits at most 2 s for the session lock. After that it logs `kind=lock_timeout` and exits 0, so a stuck lock never reaches Claude Code's hook timeout.
+
 **Known gap.** Pressing Esc or choosing "No" at a permission prompt fires no hook event at all. If you then walk away without typing, you may still get one tap.
 
 ## Sweeper and delivery
 
-- **Exclusivity.** `tap sweep` takes a non-blocking `flock` on `state/sweeper.lock`, so only one runs at a time. Any hook that leaves an open episode spawns it, and a duplicate exits immediately.
+- **Exclusivity.** `tap sweep` takes a non-blocking `flock` on `${CLAUDE_PLUGIN_DATA}/sweeper.lock`, so only one runs at a time. The lock lives outside `state/`, so no session id can collide with it. Any hook that leaves an open episode spawns it, and a duplicate exits immediately.
 - **Loop.** Scan every session file and sleep `min(earliest_due − now, 5 s)`.
 - **Shutdown.** When no episode is open, release the lock and **re-scan once**. Exit only if the second scan is also empty. This closes the race with a hook that opens an episode during shutdown.
 - **When an episode is due**, check in order:
-  1. **Session gone?** The recorded `claude` process (pid plus start time) has exited → close as `session_gone`.
-  2. **Permission tool running?** For `needs_permission`: a process descended from `claude` that started after `bound_at` is alive in two samples taken 2 s apart → postpone 30 s, up to a total of 10 minutes.
+  1. **Session gone?** The recorded `claude` process (pid plus start time) has exited or is a zombie → close as `session_gone`. Hooks detect `claude` once per session and store it; they detect again only when the stored process is gone. Every `ps` call runs with `LC_ALL=C TZ=UTC0`.
+  2. **Permission tool running?** For `needs_permission`: a process descended from `claude` that started at or after `bound_at + 1 s` is alive in two samples taken 2 s apart → postpone 30 s, up to a total of 10 minutes. The extra second is the minimum time a human takes to approve, so a parallel tool started just before the prompt does not count.
   3. **Policy.** `done` and `info` taps are sent only if enabled. Otherwise the episode is closed as `suppressed`.
-  4. **Claim.** Under the session lock, move `open` → `sending{attempt}`.
+  4. **Claim.** Under the session lock, move `open` → `sending{attempt}`, only if the episode is still the same one and is still due (`now ≥ max(due_at, retry_at)`).
   5. **Send**, then record the result:
 
      | Outcome | New state |

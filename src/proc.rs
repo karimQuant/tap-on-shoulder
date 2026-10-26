@@ -3,7 +3,8 @@
 //! - Claude detection: walk up to 4 ancestors; a process is Claude if its comm
 //!   basename is `claude`, or `node` with an argv entry containing `claude`.
 //!   Otherwise fall back to the parent of the hook's `sh`.
-//! - Identity: Linux `/proc/<pid>/stat` field 22; macOS `ps -o lstart=`.
+//! - Identity: Linux `/proc/<pid>/stat` field 22; macOS `ps -o stat=,lstart=`.
+//!   A zombie counts as gone on both. Every `ps` runs with `LC_ALL=C TZ=UTC0`.
 //! - Descendants: `/proc` on Linux, `ps -axo pid=,ppid=,etime=,comm=` elsewhere.
 
 use std::collections::HashMap;
@@ -101,8 +102,21 @@ fn start_token(pid: i32) -> Option<String> {
 
 #[cfg(not(target_os = "linux"))]
 fn start_token(pid: i32) -> Option<String> {
-    let out = ps(&["-o", "lstart=", "-p", &pid.to_string()])?;
-    let t = out.trim();
+    // `stat` first: it is one word, while `lstart` contains spaces. A zombie
+    // (state `Z...`) counts as gone.
+    let out = ps(&["-o", "stat=,lstart=", "-p", &pid.to_string()])?;
+    parse_stat_lstart(&out)
+}
+
+/// Parse one `ps -o stat=,lstart=` row into the start token, or `None` for a
+/// zombie or an empty row.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+fn parse_stat_lstart(out: &str) -> Option<String> {
+    let (stat, lstart) = out.trim().split_once(char::is_whitespace)?;
+    if stat.starts_with('Z') {
+        return None;
+    }
+    let t = lstart.trim();
     (!t.is_empty()).then(|| t.to_string())
 }
 
@@ -141,8 +155,12 @@ fn argv(pid: i32) -> Vec<String> {
 
 #[cfg_attr(target_os = "linux", allow(dead_code))]
 fn ps(args: &[&str]) -> Option<String> {
+    // Fixed locale and time zone: `lstart` text must not change between a
+    // hook and the sweeper, whatever their environments.
     let out = Command::new("ps")
         .args(args)
+        .env("LC_ALL", "C")
+        .env("TZ", "UTC0")
         .stdin(Stdio::null())
         .stderr(Stdio::null())
         .output()
@@ -316,6 +334,16 @@ mod tests {
             .map(|(p, _)| p)
             .collect();
         assert_eq!(pids, vec![13, 14]);
+    }
+
+    #[test]
+    fn stat_lstart_parsing() {
+        assert_eq!(
+            parse_stat_lstart("Ss   Mon Oct 26 09:00:01 2026\n").as_deref(),
+            Some("Mon Oct 26 09:00:01 2026")
+        );
+        assert_eq!(parse_stat_lstart("Z+   Mon Oct 26 09:00:01 2026"), None);
+        assert_eq!(parse_stat_lstart(""), None);
     }
 
     #[test]

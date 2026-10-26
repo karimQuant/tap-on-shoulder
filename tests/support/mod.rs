@@ -11,7 +11,7 @@ use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
-use std::sync::atomic::{AtomicU8, Ordering};
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
@@ -82,6 +82,8 @@ pub struct MockNtfy {
     pub url: String,
     requests: Arc<Mutex<Vec<Request>>>,
     mode: Arc<AtomicU8>,
+    /// Milliseconds to hold each response after recording the request.
+    delay_ms: Arc<AtomicU64>,
 }
 
 impl MockNtfy {
@@ -90,18 +92,26 @@ impl MockNtfy {
         let url = format!("http://{}", listener.local_addr().unwrap());
         let requests = Arc::new(Mutex::new(Vec::new()));
         let mode = Arc::new(AtomicU8::new(mode as u8));
-        let (reqs, m) = (requests.clone(), mode.clone());
+        let delay_ms = Arc::new(AtomicU64::new(0));
+        let (reqs, m, d) = (requests.clone(), mode.clone(), delay_ms.clone());
         std::thread::spawn(move || {
             for stream in listener.incoming().flatten() {
-                let (reqs, m) = (reqs.clone(), m.clone());
-                std::thread::spawn(move || handle(stream, &reqs, &m));
+                let (reqs, m, d) = (reqs.clone(), m.clone(), d.clone());
+                std::thread::spawn(move || handle(stream, &reqs, &m, &d));
             }
         });
         MockNtfy {
             url,
             requests,
             mode,
+            delay_ms,
         }
+    }
+
+    /// Hold every response for `d` after the request is recorded, so a send
+    /// stays in flight.
+    pub fn set_delay(&self, d: Duration) {
+        self.delay_ms.store(d.as_millis() as u64, Ordering::SeqCst);
     }
 
     /// A URL where nothing listens (connection refused).
@@ -137,7 +147,7 @@ impl MockNtfy {
     }
 }
 
-fn handle(stream: TcpStream, reqs: &Mutex<Vec<Request>>, mode: &AtomicU8) {
+fn handle(stream: TcpStream, reqs: &Mutex<Vec<Request>>, mode: &AtomicU8, delay_ms: &AtomicU64) {
     let mut reader = BufReader::new(stream.try_clone().unwrap());
     let mut line = String::new();
     if reader.read_line(&mut line).unwrap_or(0) == 0 {
@@ -173,6 +183,10 @@ fn handle(stream: TcpStream, reqs: &Mutex<Vec<Request>>, mode: &AtomicU8) {
         headers,
         body: String::from_utf8_lossy(&body).into_owned(),
     });
+    let delay = delay_ms.load(Ordering::SeqCst);
+    if delay > 0 {
+        std::thread::sleep(Duration::from_millis(delay));
+    }
     let mut out = stream;
     let resp: &[u8] = if current == Mode::Status500 as u8 {
         b"HTTP/1.1 500 Internal Server Error\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
