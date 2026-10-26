@@ -66,7 +66,8 @@ Evaluated on `tail` unless noted. All regexes are case-insensitive and use synta
 - **variant `embed`:** `x = [emb(tail) (256), emb(text) (256), f0..f11 (12)]`, so 524 dimensions.
 - **variant `features`:** `x = [f0..f11]`, so 12 dimensions. This is the fallback (option D).
 - **Head:** `logits = W·x + b`, with `W` of shape [4][dim]. Then `p = softmax(logits)`, computed in f32 with max-subtraction.
-- **Decision with `lean = alert`:** if `p[0] + p[1] ≥ lean_threshold` (0.25), choose whichever of 0 and 1 has the higher probability. Otherwise take `argmax(p)`. With `lean = balanced`, always take `argmax(p)`.
+- **Decision with `lean = alert`:** if `p[0] + p[1] ≥ lean_threshold`, choose whichever of 0 and 1 has the higher probability. Otherwise take `argmax(p)`. With `lean = balanced`, always take `argmax(p)`.
+- **`lean_threshold`** is read from `head.json`; the Rust runtime rejects a head without it. The shipped head uses **0.35**, the value `model/train.py` picks under the grouped-CV tap-recall gate in [model.md](model.md#release-bar). 0.25 is only the fallback that `model/train.py` uses when no threshold is passed, and the value in the example below and in test heads.
 
 `assets/head.json`:
 ```json
@@ -101,11 +102,16 @@ Candidates are scanned from the end of `text`, and the first one found is used:
 The chosen line has markdown markers removed (`#`, `*`, `_`, `` ` ``, `>`, list bullets), then goes through `sanitize`:
 
 - Strip control and bidi characters (U+202A–U+202E, U+2066–U+2069, U+200E/F).
-- Replace URLs (`https?://\S+`) with `<url>`.
-- Redact these patterns:
-  - emails, as `<email>`
-  - absolute paths with at least two segments (`(^|\s)(~?/[\w.\-]+(?:/[\w.\-]+)+)`, replaced by `$1<path>` so the leading whitespace is kept, and Windows `[A-Za-z]:\\\S+`), as `<path>`
-  - key-like tokens (`(sk|pk|ghp|gho|ghs|github_pat|xox[abpr]|AKIA)[\w\-]{8,}`, plus any token of 32 or more chars from `[A-Za-z0-9+/=_\-]`), as `<redacted>`
+- Apply these redactions in this order. Each is a leftmost, non-overlapping replace over the output of the previous one. They are written as regexes here but implemented as hand-written linear scanners, so no regex is compiled at runtime. `\w` is a Unicode word character.
+  1. **URLs**, as `<url>`:
+     - `(?i)(https?|file|ftp|ssh)://\S+`
+     - scp-style git remotes: `(?i)(?<!\w)git@[\w.\-]+:\S+`
+  2. **Secret values**, as `<redacted>`, keeping the key and separator: ``(?i)(?<![A-Za-z0-9])KEY["'`]? *[=:] *["'`]?([^\s"'`]+)``, replacing only the value (group 1). An opening quote is kept and the value stops at the next whitespace or quote. `KEY` is one of `password`, `passwd`, `pass`, `pwd`, `secret`, `token`, `api_key`, `apikey`, `api-key`, `access_key`, `auth`, `bearer`, `private_key`. A `_` or `-` before the key still counts, so `DB_PASSWORD=x` is caught. Longer words such as `passwords:` and `author:` are not keys.
+  3. **Emails**, as `<email>`: `[\w.+\-]+@[\w\-]+(?:\.[\w\-]+)+`.
+  4. **Absolute paths**, as `<path>`:
+     - Unix paths with at least two segments: `(^|[^\w/])(~?/[\w.\-]+(?:/[\w.\-]+)+)`, replaced by `$1<path>`. A path may start at the beginning of the text or after any character that is neither a word character nor `/`, such as whitespace, a quote, `(`, `[`, `=`, `:` or `,`. That boundary keeps `and/or`, `3/4` and `a/b` unchanged.
+     - Windows paths: `[A-Za-z]:\\\S+`.
+  5. **Key-like tokens**, as `<redacted>`: `(sk|pk|ghp|gho|ghs|github_pat|xox[abpr]|AKIA)[\w\-]{8,}`, plus any token of 32 or more characters from `[A-Za-z0-9+/=_\-]`.
 - Collapse whitespace.
 - Truncate to 80 scalar values, using `…` when cut.
 

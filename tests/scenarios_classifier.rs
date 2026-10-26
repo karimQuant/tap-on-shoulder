@@ -223,6 +223,44 @@ fn summary_prefers_question_then_blocker() {
 }
 
 #[test]
+fn summary_redacts_quoted_paths_secrets_and_schemes() {
+    let cases = [
+        (
+            "Plan ready.\nShould I delete '/home/alice/acme-corp/payroll.csv'?", // leak-scan: allow
+            "Should I delete '<path>'?",
+        ),
+        (
+            "Committed.\n- Push to (/Users/bob/clients/x)?", // leak-scan: allow
+            "Push to (<path>)?",
+        ),
+        (
+            "Found creds.\npassword=Hunter2Hunter2! and token=abcd1234efgh5678ijkl?", // leak-scan: allow gitleaks:allow
+            "password=<redacted> and token=<redacted>",
+        ),
+        (
+            "Reading.\nfailed to open file:///etc/shadow",
+            "failed to open <url>",
+        ),
+    ];
+    for (msg, want) in cases {
+        let got = sanitize::summary(msg);
+        assert_eq!(got, want, "{msg:?}");
+        assert_safe_summary(&got);
+        for leak in ["alice", "bob", "Hunter2", "abcd1234", "shadow"] {
+            assert!(!got.contains(leak), "{leak:?} leaked: {got:?}");
+        }
+    }
+    for prose in [
+        "Keep and/or drop?",
+        "Rename snake_case_word?",
+        "3/4 of tests pass?",
+        "Use e.g. a/b?",
+    ] {
+        assert_eq!(sanitize::summary(prose), prose);
+    }
+}
+
+#[test]
 fn redact_for_training_keeps_newlines() {
     let text = format!(
         "line one {}\n\tsecond\u{202E}  line {}\nthird https://a.b/c",
