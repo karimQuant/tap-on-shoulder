@@ -66,3 +66,37 @@ pub fn label() -> i32 {
     let mut out = std::io::stdout();
     training::label(&mut input, &mut out)
 }
+
+/// `tap classify`: classify a message read from stdin and print the category,
+/// the sanitized summary, and the model probabilities. Diagnostic only: no
+/// state is written and nothing is sent.
+pub fn classify_stdin() -> i32 {
+    use std::io::Read;
+    let mut buf = Vec::new();
+    if std::io::stdin()
+        .lock()
+        .take(crate::contract::STDIN_MAX_BYTES as u64)
+        .read_to_end(&mut buf)
+        .is_err()
+    {
+        eprintln!("tap classify: cannot read stdin");
+        return 2;
+    }
+    let text = String::from_utf8_lossy(&buf);
+    let classifier = crate::classify::load();
+    let c = classifier.classify(&text);
+    println!("category: {}", c.category.as_str());
+    println!("summary:  {}", c.summary);
+    match c.probs {
+        Some(p) => println!(
+            "probs:    needs_decision={:.3} blocked={:.3} done={:.3} info={:.3} ({})",
+            p[0],
+            p[1],
+            p[2],
+            p[3],
+            classifier.variant()
+        ),
+        None => println!("probs:    - ({})", classifier.variant()),
+    }
+    0
+}
