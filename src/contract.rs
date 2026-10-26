@@ -16,7 +16,7 @@ pub const MAX_TOKEN_IDS: usize = 512;
 pub const EMBED_DIM: usize = 256;
 pub const N_FEATURES: usize = 12;
 pub const SUMMARY_MAX_CHARS: usize = 80;
-pub const STDIN_MAX_BYTES: usize = 64 << 20;
+pub const STDIN_MAX_BYTES: usize = 8 << 20;
 pub const MAX_PENDING_TOOLS: usize = 32;
 pub const DEFAULT_LEAN_THRESHOLD: f32 = 0.25;
 
@@ -198,6 +198,14 @@ pub struct Episode {
     pub trigger: String,
     /// Tool binding for bound episodes (plan R3).
     pub tool_use_id: Option<String>,
+    /// Ambiguous binding: every pending call of the requested tool. The
+    /// episode closes once none of them is pending. `tool_use_id` is `None`.
+    #[serde(default)]
+    pub candidate_ids: Vec<String>,
+    /// Binding by name only (no pending call of that tool was known): a
+    /// `Post*` for this tool closes the episode.
+    #[serde(default)]
+    pub bound_tool_name: Option<String>,
     pub opened_at: i64,
     /// Last time this episode was bound to a tool (plan R4 process check).
     #[serde(default)]
