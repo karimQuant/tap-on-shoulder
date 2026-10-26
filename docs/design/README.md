@@ -5,9 +5,9 @@ This folder holds the engineering side of tap-on-shoulder: what we verified, wha
 | Document | Status | Contents |
 |---|---|---|
 | [Verified interfaces](verified-interfaces.md) | ✅ Available | Claude Code capabilities we rely on, each with a documentation link, plus the list of unverified assumptions |
-| [Product spec](product-spec.md) | 📝 Draft | Goals, non-goals, user stories, settings, notification policy, acceptance scenarios |
-| [Architecture](architecture.md) | 📝 Draft | Components, event mapping, state, timer ownership, security boundaries, failure handling |
-| [Classifier model](model.md) | 📝 Draft | Model architecture, data sources, training pipeline, release bar |
+| [Product spec](product-spec.md) | ✅ v0.1 | Goals, non-goals, user stories, settings, notification policy, acceptance scenarios |
+| [Architecture](architecture.md) | ✅ v0.1 | Components, event mapping, state, timer ownership, security boundaries, failure handling |
+| [Classifier model](model.md) | ✅ v0.1 (preview) | Model architecture, data sources, training pipeline, preview gate, release bar |
 | [Open questions](open-questions.md) | 📝 Draft | Unresolved decisions, each with a recommended default and rationale |
 
 ## Principles

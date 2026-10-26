@@ -15,13 +15,22 @@ A **waiting episode** opens when a session stops and needs you. If it is still o
 
 Claude Code runs the plugin's hooks on session events.
 
-| Opens an episode | Closes an episode |
-|---|---|
-| `Stop`: Claude finished its turn | `UserPromptSubmit`: you replied |
-| `StopFailure`: the turn ended with an API error | `PreToolUse`: work resumed, e.g. after you approved a permission |
-| `Notification` (`permission_prompt`, `elicitation_dialog`) | `SessionStart` / `SessionEnd` |
+| Event | Opens or re-arms | Closes |
+|---|---|---|
+| `Stop`: Claude finished its turn | An episode with the classified category (see below) | Any episode bound to a tool call |
+| `StopFailure`: the turn ended with an API error | A `blocked` episode | Any episode bound to a tool call |
+| `PermissionRequest` | A `needs_permission` episode bound to the requested call (`needs_decision` for `AskUserQuestion` / `ExitPlanMode`) | |
+| `PreToolUse` | A `needs_decision` episode bound to the call, for `AskUserQuestion` and `ExitPlanMode` only | An unbound episode (work resumed) |
+| `PostToolUse` / `PostToolUseFailure` | | The episode bound to this call (approved and finished), and any unbound episode |
+| `PermissionDenied` | | The episode bound to the denied tool, and any unbound episode |
+| `Notification` | `elicitation_dialog`: a `needs_decision` episode. `permission_prompt` only confirms that an open permission episode's prompt is on screen | |
+| `ElicitationResult` | | The elicitation episode |
+| `UserPromptSubmit`: you replied | | Any episode |
+| `SessionStart` / `SessionEnd` | | Any episode (`SessionEnd` deletes the session's state) |
 
-If a `Stop` arrives while background tasks are still running, it doesn't open an episode. The session is still **working**.
+A permission episode stays open while the prompt is on screen: approving it only lets the tool start, so the episode closes on the `PostToolUse` (or `PostToolUseFailure`) of the bound call, or when you reply. If several pending calls of the same tool could be behind the prompt, it closes once none of them is still pending.
+
+If a `Stop` arrives while background tasks are still running and the message is classified `done` or `info`, it doesn't open an episode: the session is still **working**, and a new `Stop` arrives when the work finishes. A question or a blocker still opens one.
 
 ## 2. One sweeper for all sessions
 
@@ -47,15 +56,15 @@ It sends only when all four hold, and it sends **at most once** per episode.
 | `unknown` | Missing or contradictory events | Logged and shown in `tap doctor`. Never treated as idle |
 
 - **Event rules decide first.** A permission prompt means `needs_permission`. An API error means `blocked`. Claude asking through its question tool means `needs_decision`.
-- **The embedded model handles the rest.** When the rules can't decide, the plugin reads Claude's final message with a small model (model2vec static embeddings plus a linear head, about 30 MB). It runs on your CPU in milliseconds.
+- **The embedded model handles the rest.** When the rules can't decide, the plugin reads Claude's final message with a small model (model2vec static embeddings plus a linear head, about 8 MB, built into the binary). The shipped head is a *preview* trained on synthetic data; see [model.md](design/model.md). It runs on your CPU in milliseconds.
 - **The model only labels.** It is not generative, so all it can do is pick one of the labels above.
 - **The summary is copied, not written.** It is the last question or error line from the message, redacted and cut to 80 characters.
 
-Classification runs as soon as the episode opens, because that is when its grace period gets chosen. Questions, permissions, and blocked states each have their own grace period.
+Classification runs in the `Stop` hook, as soon as the episode opens, because that is when its grace period gets chosen. A `done` or `info` result with its alert turned off closes the episode right there (`suppressed`), so the sweeper never sees it. Questions, permissions, and blocked states each have their own grace period.
 
 ## 4. One notification
 
-The plugin sends one notification to your ntfy topic: project folder name, wait time, category, and the summary. It then marks the episode as notified, so a restart can't send it again.
+The plugin sends one notification to your ntfy topic: project folder name, wait time, category, and the summary. It claims the episode (`sending`) under a lock before sending and then records `notified`, `failed`, or `sent_uncertain`, so a restart can't send it again.
 
 ## Sessions, subagents, background work
 
@@ -67,7 +76,7 @@ The plugin sends one notification to your ntfy topic: project folder name, wait 
 | Failure | Behaviour |
 |---|---|
 | Binary missing or unverified | A one-line warning at session start, plus a log entry. No taps until the background install succeeds |
-| Embedded model fails to load | Rules-only classification, logged |
-| Classifier unsure | `lean = "alert"`: tap rather than stay silent |
-| ntfy unreachable | Limited retries, then logged and shown in `tap doctor`. Never counted as delivered |
-| Machine slept or restarted | Wall-clock check on the next hook. The `notified` flag prevents duplicates |
+| Embedded model fails to load | Rules-only classification; `tap doctor` shows `model: rules` |
+| Classifier unsure | `classifier.lean = "alert"`: if `p(needs_decision) + p(blocked)` ≥ the head's `lean_threshold` (0.35), tap rather than stay silent |
+| ntfy unreachable | Up to 3 attempts, then recorded as `failed`, logged, and shown in `tap doctor` (which exits 1 while the server is unreachable). Never counted as delivered |
+| Machine slept or restarted | Due times are wall-clock, and the next hook restarts the sweeper. The episode status (`sending`, `notified`) prevents duplicates |

@@ -49,7 +49,7 @@ tap-on-shoulder alerts only on **continuous waiting** and tells you **what's nee
 
 ## Security at a glance
 
-- 🔒 **Runs locally.** Classification uses a small embedded model (model2vec, under 2 ms on a CPU). No cloud LLM and no hosted backend.
+- 🔒 **Runs locally.** Classification uses a small embedded model (model2vec, about 8 MB, under 5 ms on a CPU). No cloud LLM and no hosted backend.
 - 📤 **Sends one thing:** a short, redacted notification (project, wait time, what's needed) to *your* ntfy topic. No telemetry.
 - 🙈 **Never reads your code** or transcript files. It sees only the hook data Claude Code gives plugins.
 - ✋ **Never acts.** It cannot approve permissions, type into a session, or resume a task. It only watches.
@@ -71,7 +71,7 @@ Read the full [security model →](docs/security.md)
 
 ## Contributing
 
-This project is at the design stage, which is the best time to influence it. Ideas, critiques, and real-world "Claude was waiting and I missed it" stories are all welcome. See [CONTRIBUTING.md](CONTRIBUTING.md). To report a security issue, see [SECURITY.md](SECURITY.md).
+This project is in alpha, which is the best time to influence it. The most useful help right now is real-world testing: run it in your own sessions and report missed or unwanted taps. The classifier is trained on synthetic data only, so labelled real endings help most. Turn on `training.collect = true` in your user config, then label what was collected with `tap label` (the data stays on your machine; share only what you choose). Ideas, critiques, and "Claude was waiting and I missed it" stories are welcome too. See [CONTRIBUTING.md](CONTRIBUTING.md). To report a security issue, see [SECURITY.md](SECURITY.md).
 
 ## License
 

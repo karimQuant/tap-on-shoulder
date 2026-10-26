@@ -54,8 +54,8 @@ The full reference is in [configuration.md](../configuration.md).
 | `grace.question` / `grace.permission` / `grace.blocked` | `5m` each | Minimum `5s`, maximum `24h` |
 | `alerts.completion` | `false` | Tap on `done` |
 | `alerts.info` | `false` | Tap on `info` |
-| `classifier.mode` | `model` | `rules` disables the embedded model |
-| `classifier.lean` | `alert` | When the model is uncertain, choose the category that taps |
+| `classifier.mode` | `model` | **User config only.** `model` uses the embedded head when the build has one (else the rules); `rules` always uses the rules classifier |
+| `classifier.lean` | `alert` | **User config only.** `alert`: if `p(needs_decision) + p(blocked)` ≥ head.json's `lean_threshold` (0.35 shipped), the higher of those two wins, else argmax. `balanced`: plain argmax |
 | Project config | — | `<repo>/.claude/tap-on-shoulder.toml` may only shorten `grace.*` and set `alerts.completion` |
 | `notify.ntfy.server` / `topic` / `token_env` | `https://ntfy.sh` / random / unset | **User config only.** A project config can never change these |
 | `notify.ntfy.privacy` | `summary` | `category-only` drops the summary |
@@ -65,11 +65,11 @@ The full reference is in [configuration.md](../configuration.md).
 
 1. An episode opens only on the arming events listed in [architecture.md](architecture.md#event-mapping).
 2. **Category grace:** a tap is due at `opened_at + grace[category]`. Waits classified as `done` or `info` use `grace.question`, and tap only if enabled.
-3. **At most one tap per episode.** The `notified` flag is set under a lock *before* sending. A failed send is retried at most 3 times within 2 minutes, then recorded as failed. It is never silently counted as delivered.
+3. **At most one tap per episode.** The sweeper claims the episode under a lock *before* sending: `open → sending → notified / failed / sent_uncertain`. Only a connection failure (nothing was sent) returns it to `open` for a retry, with backoff 15 s then 30 s, for at most 3 attempts in total before it is recorded as `failed`. An HTTP error status is `failed` at once. A connection dropped after the request was written is `sent_uncertain` and is never retried. No outcome is silently counted as delivered.
 4. **Cancellation:** any activity event for the session closes the episode. A newer turn produces a new `episode_id`, so a stale check can never notify about a newer turn.
 5. **Concurrent sessions:** every session is independent. There is no grouping in v0.1.
 6. **Unknown:** if state can't be determined (corrupt file, missing events), the session state is `unknown`. It is logged and shown in `tap doctor`, and it does **not** tap.
-7. **Binary missing:** no taps are sent until the background install succeeds. `SessionStart` shows a one-line warning, and `tap doctor` explains why.
+7. **Binary missing:** no taps until the background install succeeds; `SessionStart` shows a one-line warning.
 
 ## Notification content
 
@@ -90,11 +90,11 @@ The full reference is in [configuration.md](../configuration.md).
 | 6 | A permission prompt appears | Tap after `grace.permission` unless it was approved or denied first |
 | 7 | Two sessions wait concurrently | Two taps, each with the correct project |
 | 8 | The sweeper process dies (reboot, OOM) or the plugin restarts mid-episode | No duplicate tap. On the next `SessionStart`, stale episodes are closed. A tap already sent is never sent again |
-| 9a | The embedded model fails to load | Rules-only classification, logged, shown in `tap doctor` |
+| 9a | The embedded model fails to load | Rules-only classification, shown as `model: rules` in `tap doctor` |
 | 9b | ntfy is unreachable | Bounded retry, then recorded as failed and shown in `tap doctor` |
 | 10 | The final message contains instructions aimed at the classifier | The output is only a category label and an extractive summary. No other effect |
 | 11 | A project config tries to change `notify.*` | Ignored with a warning |
-| 12 | `TAP_GRACE_OVERRIDE=5s` | The full flow completes in about 5 seconds |
+| 12 | `TAP_DEV=1 TAP_GRACE_OVERRIDE=5s` | The full flow completes in about 5 seconds |
 
 ## Success criteria for v0.1
 

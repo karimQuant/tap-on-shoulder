@@ -48,7 +48,7 @@ Your phone should show a test notification within a few seconds.
 ## 4. Try it without waiting 5 minutes
 
 ```bash
-TAP_GRACE_OVERRIDE=10s claude
+TAP_DEV=1 TAP_GRACE_OVERRIDE=10s claude
 ```
 
 Ask Claude something that ends with a question, then don't answer. About 10 seconds later you get a tap. Reply before then, and nothing is sent.
