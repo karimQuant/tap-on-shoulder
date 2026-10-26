@@ -271,11 +271,11 @@ mod tests {
 
     #[test]
     fn redaction_keeps_newlines_and_removes_secrets() {
-        let t = "Mail bob@example.com\nsee /home/u/secret/file.rs and https://x.y/z\nkey sk-abcdefghijklmnop\n\x1b[31mred\x1b[0m\u{202E}x";
+        let t = "Mail bob@example.com\nsee /home/u/secret/file.rs and https://x.y/z\nkey sk-abcdefghijklmnop\n\x1b[31mred\x1b[0m\u{202E}x"; // leak-scan: allow
         let r = redact_for_training(t);
         assert!(r.contains('\n'));
         assert!(!r.contains("bob@"));
-        assert!(!r.contains("/home/u"));
+        assert!(!r.contains("/home/u")); // leak-scan: allow
         assert!(!r.contains("x.y"));
         assert!(!r.contains("sk-abc"));
         assert!(!r.contains('\x1b'));
