@@ -184,17 +184,37 @@ impl FileLock {
     /// Take the lock without blocking; `Ok(None)` if someone else holds it.
     pub fn try_acquire(path: &Path) -> io::Result<Option<FileLock>> {
         let file = open_lock_file(path)?;
-        // SAFETY: fd is valid for the lifetime of `file`.
-        let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
-        if rc == 0 {
-            return Ok(Some(FileLock { _file: file }));
+        Ok(try_flock(&file)?.then_some(FileLock { _file: file }))
+    }
+
+    /// Wait at most `timeout` for the lock; `ErrorKind::TimedOut` after that.
+    pub fn acquire_timeout(path: &Path, timeout: Duration) -> io::Result<FileLock> {
+        let file = open_lock_file(path)?;
+        let deadline = std::time::Instant::now() + timeout;
+        loop {
+            if try_flock(&file)? {
+                return Ok(FileLock { _file: file });
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(io::Error::new(io::ErrorKind::TimedOut, "lock_timeout"));
+            }
+            std::thread::sleep(Duration::from_millis(10));
         }
-        let err = io::Error::last_os_error();
-        if err.kind() == io::ErrorKind::WouldBlock {
-            Ok(None)
-        } else {
-            Err(err)
-        }
+    }
+}
+
+/// Non-blocking exclusive `flock`; `Ok(false)` if someone else holds it.
+fn try_flock(file: &File) -> io::Result<bool> {
+    // SAFETY: fd is valid for the lifetime of `file`.
+    let rc = unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) };
+    if rc == 0 {
+        return Ok(true);
+    }
+    let err = io::Error::last_os_error();
+    match err.kind() {
+        io::ErrorKind::WouldBlock => Ok(false),
+        io::ErrorKind::Interrupted => Ok(false),
+        _ => Err(err),
     }
 }
 
@@ -236,10 +256,26 @@ impl Store {
         self.dir.join(format!("{sid}.json"))
     }
 
+    /// `${CLAUDE_PLUGIN_DATA}/sweeper.lock`. It lives outside `state/`, so it
+    /// can never collide with a session's `<id>.lock`.
+    pub fn sweeper_lock_path(&self) -> PathBuf {
+        self.dir.parent().unwrap_or(&self.dir).join("sweeper.lock")
+    }
+
+    fn lock_path(&self, sid: &str) -> PathBuf {
+        debug_assert!(valid_session_id(sid));
+        self.dir.join(format!("{sid}.lock"))
+    }
+
     /// Exclusive lock for one session's read-modify-write.
     pub fn lock(&self, sid: &str) -> io::Result<FileLock> {
-        debug_assert!(valid_session_id(sid));
-        FileLock::acquire(&self.dir.join(format!("{sid}.lock")))
+        FileLock::acquire(&self.lock_path(sid))
+    }
+
+    /// Like [`Store::lock`], but gives up after `timeout`, so a stuck lock
+    /// never runs a hook into Claude Code's hook timeout.
+    pub fn lock_timeout(&self, sid: &str, timeout: Duration) -> io::Result<FileLock> {
+        FileLock::acquire_timeout(&self.lock_path(sid), timeout)
     }
 
     pub fn load(&self, sid: &str) -> Loaded {
@@ -284,31 +320,54 @@ impl Store {
         out
     }
 
-    /// Delete state, lock, and stray temp files not modified for `max_age`,
-    /// except those of `keep`.
+    /// Delete state and stray temp files not modified for `max_age`, except
+    /// those of `keep`. A `.lock` file is deleted only when its `.json` is
+    /// gone and the lock itself is older than `max_age`: unlinking a live
+    /// session's lock would let two holders lock different inodes.
     pub fn prune(&self, max_age: Duration, keep: &str) {
-        let Ok(rd) = std::fs::read_dir(&self.dir) else {
-            return;
-        };
         let cutoff = SystemTime::now().checked_sub(max_age).unwrap_or(UNIX_EPOCH);
-        for e in rd.flatten() {
-            let name = e.file_name().to_string_lossy().into_owned();
-            let sid = name
-                .strip_suffix(".json")
-                .or_else(|| name.strip_suffix(".lock"));
-            if sid == Some(keep) || name == "sweeper.lock" {
-                continue;
-            }
-            if sid.is_none() && !name.starts_with(".tmp-") {
-                continue;
-            }
-            let old = e
-                .metadata()
+        let old = |p: &Path| {
+            std::fs::symlink_metadata(p)
                 .and_then(|m| m.modified())
                 .map(|t| t < cutoff)
-                .unwrap_or(false);
-            if old {
-                let _ = std::fs::remove_file(e.path());
+                .unwrap_or(false)
+        };
+        let names = || -> Vec<String> {
+            std::fs::read_dir(&self.dir)
+                .map(|rd| {
+                    rd.flatten()
+                        .map(|e| e.file_name().to_string_lossy().into_owned())
+                        .collect()
+                })
+                .unwrap_or_default()
+        };
+        // Pass 1: old state files (only while their lock is free) and temps.
+        for name in names() {
+            let path = self.dir.join(&name);
+            if let Some(sid) = name.strip_suffix(".json") {
+                if sid == keep || !valid_session_id(sid) || !old(&path) {
+                    continue;
+                }
+                if let Ok(Some(_l)) = FileLock::try_acquire(&self.lock_path(sid)) {
+                    if old(&path) {
+                        let _ = std::fs::remove_file(&path);
+                    }
+                }
+            } else if name.starts_with(".tmp-") && old(&path) {
+                let _ = std::fs::remove_file(&path);
+            }
+        }
+        // Pass 2: orphaned locks only.
+        for name in names() {
+            let Some(sid) = name.strip_suffix(".lock") else {
+                continue;
+            };
+            if sid == keep || !valid_session_id(sid) || self.path(sid).exists() {
+                continue;
+            }
+            let path = self.dir.join(&name);
+            if old(&path) {
+                let _ = std::fs::remove_file(&path);
             }
         }
     }

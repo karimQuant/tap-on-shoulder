@@ -1,10 +1,12 @@
 //! `tap sweep`: the single on-demand sweeper (plan D1, R2, R4, R5).
 //!
-//! - Holds a non-blocking `flock` on `state/sweeper.lock`; exits if taken.
+//! - Holds a non-blocking `flock` on `${CLAUDE_PLUGIN_DATA}/sweeper.lock`
+//!   (outside `state/`, so no session id can collide with it); exits if taken.
 //! - Loop: scan every session; sleep `min(earliest_due - now, 5 s)`.
 //! - Exit protocol: when nothing is open, release the lock, re-scan once, and
 //!   re-acquire if anything is open again (closes the exit race).
-//! - Delivery (at most once): `open → sending` under the session lock, send
+//! - Delivery (at most once): `open → sending` under the session lock (only
+//!   if the episode is still due), send
 //!   without the lock, then `notified | open(retry) | failed | sent_uncertain`
 //!   only if the episode is still the same `sending` one (write guard).
 
@@ -57,12 +59,25 @@ struct Sweeper {
     corrupt_logged: HashSet<String>,
 }
 
+/// Debug-only test pause (`TAP_DEV=1` debug builds), logged as `kind` first
+/// so a test can act inside the window.
+fn test_pause(var: &str, kind: &'static str) {
+    if !config::test_knobs() {
+        return;
+    }
+    let Some(ms) = std::env::var(var).ok().and_then(|v| v.parse::<u64>().ok()) else {
+        return;
+    };
+    Entry::new("sweep").kind(kind).write();
+    std::thread::sleep(Duration::from_millis(ms));
+}
+
 /// Run the sweeper until no episode is open.
 pub fn run() {
     let Ok(store) = Store::open(false) else {
         return;
     };
-    let lock_path = store.dir().join("sweeper.lock");
+    let lock_path = store.sweeper_lock_path();
     let Ok(Some(lock)) = FileLock::try_acquire(&lock_path) else {
         return;
     };
@@ -84,6 +99,7 @@ pub fn run() {
             }
             None => {
                 drop(lock.take());
+                test_pause("TAP_TEST_SWEEP_EXIT_PAUSE_MS", "test_exit_pause");
                 if !sw.has_work() {
                     break;
                 }
@@ -142,14 +158,15 @@ impl Sweeper {
     }
 
     /// Apply `f` to the episode under the session lock, only if it is still
-    /// episode `id` with `status` and `attempts`. Returns the updated episode.
+    /// episode `id` with `status` and `attempts` and `f` returns true.
+    /// Returns the updated episode.
     fn guarded(
         &self,
         sid: &str,
         id: &str,
         status: EpisodeStatus,
         attempts: u32,
-        f: impl FnOnce(&mut Episode),
+        f: impl FnOnce(&mut Episode) -> bool,
     ) -> Option<Episode> {
         let _l = self.store.lock(sid).ok()?;
         let Loaded::Ok(mut st) = self.store.load(sid) else {
@@ -159,7 +176,9 @@ impl Sweeper {
         if ep.id != id || ep.status != status || ep.attempts != attempts {
             return None;
         }
-        f(ep);
+        if !f(ep) {
+            return None;
+        }
         let out = ep.clone();
         st.updated_at = state::now();
         self.store.save(&st).ok()?;
@@ -170,6 +189,7 @@ impl Sweeper {
         let done = self.guarded(sid, &ep.id, ep.status, ep.attempts, |e| {
             e.status = status;
             e.closed_reason = Some(reason.into());
+            true
         });
         if done.is_some() {
             short(Entry::new("sweep"), sid, ep)
@@ -211,7 +231,10 @@ impl Sweeper {
         // D3/R4: an approved tool may already be running.
         if ep.category == Category::NeedsPermission && ep.postponed_s < self.timing.postpone_cap_s {
             if let Some(c) = &snap.claude {
-                let since = ep.bound_at.unwrap_or(ep.opened_at);
+                // A human approval takes at least about a second, so a
+                // parallel tool started just before the prompt is not "the
+                // approved tool".
+                let since = ep.bound_at.unwrap_or(ep.opened_at) + 1;
                 if crate::proc::tool_running(c.pid, since, self.timing.sample_gap) {
                     let step = self.timing.postpone_step_s;
                     let now = state::now();
@@ -219,6 +242,7 @@ impl Sweeper {
                         e.postponed_s += step;
                         e.due_at = now + step;
                         e.retry_at = None;
+                        true
                     });
                     return match upd {
                         Some(e) => {
@@ -249,6 +273,7 @@ impl Sweeper {
                     .guarded(sid, &ep.id, EpisodeStatus::Open, ep.attempts, |x| {
                         x.status = EpisodeStatus::Failed;
                         x.closed_reason = Some(kind.into());
+                        true
                     })
                     .is_some()
                 {
@@ -260,11 +285,22 @@ impl Sweeper {
                 return None;
             }
         };
+        test_pause("TAP_TEST_SWEEP_CLAIM_PAUSE_MS", "test_claim_pause");
         let now = state::now();
+        // Re-check the due time under the lock: a hook may have re-armed or
+        // rebound the episode since the snapshot.
         let claimed = self.guarded(sid, &ep.id, EpisodeStatus::Open, ep.attempts, |e| {
+            if now < e.due_at.max(e.retry_at.unwrap_or(0)) {
+                return false;
+            }
             e.status = EpisodeStatus::Sending;
             e.sending_since = Some(now);
-        })?;
+            true
+        });
+        let Some(claimed) = claimed else {
+            // Changed or not due any more; look again soon.
+            return Some(state::now_ms());
+        };
         short(Entry::new("sweep"), sid, &claimed)
             .transition("sending")
             .write();
@@ -304,6 +340,7 @@ impl Sweeper {
                         e.status = EpisodeStatus::SentUncertain;
                     }
                 }
+                true
             },
         );
         let Some(e) = updated else {
