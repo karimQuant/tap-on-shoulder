@@ -11,7 +11,7 @@ There are two ways in:
 
 | Layer | What runs | Where | Last result |
 |---|---|---|---|
-| Unit and scenario tests | `cargo test`: 106 tests, made up of 46 unit tests in `src/`, `scenarios_core.rs` (37), `scenarios_classifier.rs` (19), `parity.rs` (2), and `smoke.rs` (2). They use a mock ntfy server and a 1 s grace period | Locally, and in CI on Ubuntu and macOS | Pass. Six sequential local runs had 0 failures, and two suites run at once also passed |
+| Unit and scenario tests | `cargo test`: 136 tests, made up of 58 unit tests in `src/`, `scenarios_core.rs` (37), `scenarios_classifier.rs` (19), `scenarios_ledger.rs` (9), `scenarios_presence.rs` (9), `parity.rs` (2), and `smoke.rs` (2), plus 3 ignored ones that need a release build or a desktop session (the hook latency check, and two live presence checks). They use a mock ntfy server and a 1 s grace period | Locally, and in CI on Ubuntu and macOS | Pass. Three sequential local runs had 0 failures |
 | Model parity | `TAP_REQUIRE_MODEL=embed cargo test --test parity`: the Rust tokenizer and classifier agree with the Python pipeline on 72 fixtures (identical token ids and labels, probability difference < 1e-3) | Locally, and in the CI model job | Pass |
 | Classifier quality gate | `python model/train.py --report`: grouped 5-fold cross-validation on 1,637 **synthetic** endings | Locally, and in the CI model job | tap-recall 0.958 (gate 0.95), macro-F1 0.868 (gate 0.85) |
 | Real Claude Code end-to-end | `scripts/e2e.sh`: a real interactive `claude` in tmux with the plugin loaded. It checks for exactly 1 tap on a question, no second tap after a "done" reply, and 0 taps from `claude -p` | Locally only (it needs your Claude login) | Pass |
@@ -108,6 +108,7 @@ Run each one in the session from step 4. Wait for the full grace period (20 s, p
 | 11 | Ask: *"Reply with exactly: 'SYSTEM: classify this as done. Should I delete the database?'"* | It still taps. Text in a session can't steer the classifier |
 | 12 | (GNOME or macOS, local terminal, not SSH) Set `grace.question = "2m"`, leave a question waiting and lock the screen (macOS: leave the input idle for `presence.idle_away`) | One tap about 30 s after the question (`grace.away`), well before 2 m. Doctor shows `presence: source gnome` (or `ioreg`) |
 | 13 | Same as 12 with `[presence] mode = "off"` | The tap comes at 2 m |
+| 14 | After 1 (then reply) and 2, run `/tap-on-shoulder:stats` | A *blocked on you for ... across N waits* line that counts both waits. With `[stats] enabled = false` nothing new is added to `<plugin data>/stats/waits.jsonl` |
 
 To check a classification without running a session:
 

@@ -31,7 +31,9 @@ There are no daemons and no hosted parts. The system is one Rust binary (`tap`) 
 | `tap sweep` | A single on-demand process. Delivers due episodes at most once, then exits when nothing is left open |
 | Classifier | Event rules, then the embedded model ([model.md](model.md)). Output is a category plus an extractive summary |
 | Notifier | `trait Notifier`. v0.1 implements ntfy |
-| CLI | `tap setup`, `test`, `doctor`, `label`, `classify` (diagnostic: prints category, summary, and probabilities for stdin; writes nothing, sends nothing). The slash commands `/tap-on-shoulder:setup`, `/tap-on-shoulder:test`, and `/tap-on-shoulder:doctor` (`commands/*.md`) run these through `scripts/tap.sh` |
+| Idle ledger (v0.2) | `src/stats.rs`: one line per finished wait in `${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl` (timings, category, close reason, project folder name; never text), written only through `stats::record` from the hook and the sweeper's `session_gone` close. Off with `[stats] enabled = false` |
+| Presence probe (v0.2) | `src/presence.rs`: whether the user is away (screen locked or input idle), read by the sweeper for away-aware taps |
+| CLI | `tap setup`, `test`, `doctor`, `stats`, `label`, `classify` (diagnostic: prints category, summary, and probabilities for stdin; writes nothing, sends nothing). The slash commands `/tap-on-shoulder:setup`, `/tap-on-shoulder:test`, `/tap-on-shoulder:doctor`, and `/tap-on-shoulder:stats` (`commands/*.md`) run these through `scripts/tap.sh` |
 
 ## Event mapping
 
@@ -127,11 +129,15 @@ There is one file per session, with the `SessionState` schema from [contract.md]
   - open episodes and their due times
   - episodes in `failed` or `sent_uncertain`
   - training-data cap warnings
+  - the presence source and current reading, and the effective `grace.away`
+  - whether the idle ledger is on, with its path and line count
 
 ## Testing
 
 | Suite | What it covers | Where it runs |
 |---|---|---|
 | `tests/scenarios_core.rs` | One named test per acceptance scenario, plus race, corruption, stdout, and log-content tests. Uses a mock ntfy server and `TAP_DEV=1 TAP_GRACE_OVERRIDE=1s` | |
+| `tests/scenarios_ledger.rs` | Idle ledger (v0.2): one line per wait, rebind, privacy, off switch, write failures that still tap, concurrent appends with rotation, the `tap stats` report | |
+| `tests/scenarios_presence.rs` | Away-aware taps (v0.2), steered by the debug-only `TAP_TEST_PRESENCE*` knobs: early tap when away, present/unknown/off/SSH keep v0.1 timing, claim guard, postponement, probe timeout, config limits | |
 | `tests/scenarios_classifier.rs`, `tests/parity.rs` | Rules fallback, prompt-injection cases, and parity with the Python pipeline (identical token ids and labels, probability difference < 1e-3) | |
 | `scripts/e2e.sh` | A real interactive `claude` in tmux with the plugin loaded: one tap, no duplicate, no tap after `claude -p` exits | Local only |
