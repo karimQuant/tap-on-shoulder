@@ -8,6 +8,7 @@
 | Page | Read it if you want to… |
 |---|---|
 | [Getting started](getting-started.md) | install the plugin and receive your first tap |
+| [Install and test guide](testing.md) | build from source, run the tests, and walk through every scenario by hand |
 | [Configuration](configuration.md) | change grace periods, alerts, or privacy |
 | [How it works](how-it-works.md) | understand episodes, states, and the classifier |
 | [Security & privacy](security.md) | know exactly what is read, stored, and sent |
