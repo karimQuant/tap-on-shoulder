@@ -277,9 +277,12 @@ fn s25_postpone_while_away_no_loop() {
     std::thread::sleep(secs(1.1));
     claude.start_tool();
 
-    // Away after 4 s, then three 1 s postponements (the dev-fast cap).
-    let t = first_tap_after(&mock, start, secs(25.0)).expect("tap after the cap");
-    assert!(t < 25.0);
+    // Away after 4 s, then three 1 s postponements (the dev-fast cap): the
+    // tap comes at about 8 s. The wait is generous because a loaded machine
+    // can stall the sweeper's fsyncs for seconds; that presence pulled the
+    // first check forward is asserted on the log timestamps below.
+    first_tap_after(&mock, start, secs(60.0))
+        .unwrap_or_else(|| panic!("tap after the cap: {}", env.log_text()));
     std::thread::sleep(secs(1.0));
     assert_eq!(mock.count(), 1);
     let ep = episode(&env, "s25");
@@ -291,6 +294,11 @@ fn s25_postpone_while_away_no_loop() {
         .filter_map(|l| l["ts"].as_i64())
         .collect();
     assert_eq!(ts.len(), 3, "{}", env.log_text());
+    let opened = ep["opened_at"].as_i64().unwrap();
+    assert!(
+        ts[0] < opened + 30,
+        "away must pull the first check before the 30 s grace: {ts:?}, opened {opened}"
+    );
     assert!(
         ts[2] - ts[0] >= 2,
         "postponements must be spaced by their step: {ts:?}"
