@@ -19,8 +19,17 @@
 - [x] First signed binary prerelease (`bin-v0.1.0-alpha.1`)
 - [ ] Release bar for the classifier: `needs_decision` recall ≥ 0.95 and macro-F1 ≥ 0.85 on at least 200 real, hand-labelled message endings (collect them with `training.collect` + `tap label`)
 
+## v0.2: away-aware taps and the idle ledger
+
+- [x] Away-aware taps: screen locked or idle ≥ 5 min ⇒ tap after `grace.away` (30 s); SSH and unknown keep normal timing (GNOME, macOS)
+- [x] Idle ledger and `tap stats` / `/tap-on-shoulder:stats`: blocked-on-you time, local only, no message text
+
 ## Later
 
+- Answerable taps: show the question's options in the tap (answering from the phone would need its own design; see *Not planned*)
+- Permission allow-list suggestions drawn from the ledger
+- Presence on KDE and other desktops
+- An opt-in holdout that measures whether taps shorten waits
 - Desktop notifications, Telegram, Slack, and Discord
 - Optional repeat reminders
 - A stronger classifier (Ettin encoder) if the model2vec model misses the release bar

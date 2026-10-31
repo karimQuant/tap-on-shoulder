@@ -1,7 +1,7 @@
 # How it works
 
 > [!NOTE]
-> This page describes how v0.1 works. The Claude Code behaviour it relies on is listed, with links and spike results, in [Verified interfaces](design/verified-interfaces.md).
+> This page describes how v0.1 works, plus the v0.2 additions (sections 5 and 6). The Claude Code behaviour it relies on is listed, with links and spike results, in [Verified interfaces](design/verified-interfaces.md).
 
 ![tap-on-shoulder workflow](assets/workflow.svg)
 
@@ -65,6 +65,25 @@ Classification runs in the `Stop` hook, as soon as the episode opens, because th
 ## 4. One notification
 
 The plugin sends one notification to your ntfy topic: project folder name, wait time, category, and the summary. It claims the episode (`sending`) under a lock before sending and then records `notified`, `failed`, or `sent_uncertain`, so a restart can't send it again.
+
+## 5. Away-aware taps (v0.2)
+
+The grace period assumes you might be at your desk. When you clearly aren't, waiting 5 minutes only wastes time.
+
+- **Away** means the screen is locked, or input has been idle for `presence.idle_away` (5 min). An episode then taps once it has waited `grace.away` (30 s) instead of its normal grace.
+- **At your desk**, nothing changes: you are left alone for the full grace period.
+- **SSH sessions** keep normal timing, because the local screen says nothing about you.
+- **Unknown** (no supported desktop, a probe that fails or times out) means normal timing.
+
+The sweeper asks only while an episode could tap early: GNOME's lock and idle state through `gdbus`, or macOS input idle through `ioreg`. Each answer is cached briefly and never sent anywhere. `presence.mode = "off"` turns it off. See [security](security.md#presence-probes-v02).
+
+## 6. The idle ledger (v0.2)
+
+`tap stats` and `/tap-on-shoulder:stats` answer one question: how long did your agents sit **blocked on you**?
+
+- Each finished question, permission prompt, or blocker adds one line to `<plugin data>/stats/waits.jsonl`: timestamps, category, a fixed close reason, and the project folder name. Never message text.
+- **Blocked-on-you time** is the sum of the waits that ended with your action (a reply, an approval, a denial), each capped at 2 h. Waits that ended any other way (session closed, new turn) are listed separately, not counted.
+- It stays local. `tap setup` turns it on in new configs (`[stats] enabled = true`) and says so; a missing key means off, and `enabled = false` stops it.
 
 ## Sessions, subagents, background work
 

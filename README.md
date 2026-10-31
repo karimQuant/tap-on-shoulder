@@ -2,9 +2,11 @@
 
 # tap-on-shoulder
 
-### Your agents keep working. We tap you when you're needed.
+### Your agents shouldn't wait on you.
 
-When a Claude Code session has been waiting for **you** for 5 minutes, you get **one** notification on your phone. It tells you which project is waiting and what it needs from you. Sessions that are still working never notify.
+When a Claude Code session is blocked on **you** and you've stepped away, you know within about 30 seconds: **one** notification on your phone saying which project is waiting and what it needs. At your desk, you're left alone for 5 minutes. Sessions that are still working never notify.
+
+`/tap-on-shoulder:stats` shows how long your agents sat blocked on you this week.
 
 <img src="docs/assets/demo.svg" alt="Three Claude Code sessions run in a terminal. payments-service stops to ask a question. After 5 minutes the phone shows one tap-on-shoulder notification: payments-service, waiting 5m, needs a decision." width="100%">
 
@@ -29,15 +31,26 @@ Inside Claude Code:
 
 ## The result
 
-You leave three sessions running and go get coffee. Here is what reaches your phone:
+You leave three sessions running. Here is what reaches your phone:
 
 | What happens in the session | What you get |
 |---|---|
-| `payments-service` asks *"keep the legacy column or drop it?"* | **One tap after 5 min:** *payments-service · waiting 5m · needs a decision* |
+| `payments-service` asks *"keep the legacy column or drop it?"* while you're at your desk | **One tap after 5 min:** *payments-service · waiting 5m · needs a decision* |
+| Same question, but you locked your screen and went for coffee | **One tap after 30 s** (GNOME and macOS; over SSH, normal timing) |
 | `web-app` runs a 20-minute test suite with no output | Nothing. It's working. |
 | `infra` stops for a permission prompt | One tap once its permission grace period runs out (configurable) |
 | You reply to `payments-service` after 3 minutes | Nothing. The pending tap is cancelled. |
 | A task finishes with *"All tests pass."* | Nothing, unless you turn on completion alerts |
+
+At the end of the week, `/tap-on-shoulder:stats` (example output):
+
+```text
+Last 7 days: your agents sat blocked on you for 3 h 40 m across 26 waits.
+tapped: 9 of 26
+median from tap to reply: 4.5 min
+```
+
+Each wait counts at most 2 h, only waits you ended count, and the ledger stays on your machine with no message text ([how it works](docs/how-it-works.md#6-the-idle-ledger-v02)).
 
 With Claude Code's built-in Remote Control (`/rc`) turned on, you also get Claude's own immediate push. tap-on-shoulder is the follow-up that arrives only if the session is **still** stuck.
 
@@ -62,8 +75,8 @@ Read the full [security model →](docs/security.md)
 | | |
 |---|---|
 | 🚀 [Getting started](docs/getting-started.md) | Install, set up ntfy, send a test tap |
-| ⚙️ [Configuration](docs/configuration.md) | Grace periods, completion alerts, privacy modes |
-| 🧭 [How it works](docs/how-it-works.md) | Waiting episodes, session states, the classifier |
+| ⚙️ [Configuration](docs/configuration.md) | Grace periods, away-aware taps, the idle ledger, privacy modes |
+| 🧭 [How it works](docs/how-it-works.md) | Waiting episodes, the classifier, away-aware taps, the idle ledger |
 | 🔐 [Security & privacy](docs/security.md) | What it reads, stores, sends, and never does |
 | ❓ [FAQ](docs/faq.md) | False alarms, multiple sessions, built-in notifications |
 | 🗺️ [Roadmap](docs/roadmap.md) | What's planned, what's not |
