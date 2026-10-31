@@ -142,7 +142,23 @@ The state schema is `SessionState` in `src/contract.rs` (`STATE_VERSION = 1`). I
 
 - `pending_tools[{tool_use_id, tool_name, input_hash}]`
 - `claude{pid, start}`
-- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, candidate_ids, bound_tool_name, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason}`
+- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, candidate_ids, bound_tool_name, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason, notified_at, finished_reason}`
+- `notified_at`: when the tap was sent (`notified`) or probably sent (`sent_uncertain`); never set for `failed`.
+- `finished_reason`: set when a user action (`user_prompt`, `tool_done`, `permission_denied`, `elicitation_result`) ends a `notified | sent_uncertain | failed` episode. The status is unchanged (those states never tap); the field only records that the idle ledger has this wait, so it is never recorded twice.
+
+## Idle ledger
+
+`${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl` (0700 dir, 0600 file, `O_NOFOLLOW`), one JSON line per finished `needs_decision | needs_permission | blocked` wait, written only through `stats::record`:
+
+```json
+{"v":1,"opened":1793000000,"closed":1793000420,"notified":1793000300,"category":"needs_decision","reason":"user_prompt","user":true,"project":"payments-service"}
+```
+
+- `notified`, `project`, and `early` are omitted when absent. `project` is omitted under `privacy = "category-only"`. `early` is reserved for away-aware taps.
+- `reason` → `user`: `user_prompt`, `tool_done`, `permission_denied`, `elicitation_result`, `rebind` are user actions (`true`); `session_end`, `session_gone`, `session_start`, `stop`, `stop_failure`, `background_task`, `activity` are not (`false`, excluded from blocked-on-you time).
+- A rebind records the previous prompt (`reason = "rebind"`, from its `opened_at`); the episode then restarts.
+- Appends hold `stats/waits.lock` with a non-blocking retry of at most 50 ms, never fsync, and swallow every error (`kind=stats_write_failed` in the log). Past 1 MiB the file is rewritten atomically under the lock keeping lines closed in the last 90 days.
+- `tap stats [--days N] [--json]`: blocked-on-you time is Σ min(max(closed − opened, 0), 2 h) over `user:true` lines whose `closed` falls in the last N days (default 7). Corrupt or unknown lines are skipped and counted.
 
 **Write guard:** the sweeper writes `notified`, `failed`, or `sent_uncertain` only if the episode still has the same `id` and is still `sending` with the same `attempts`. A hook that closes the episode while a send is in flight always wins.
 

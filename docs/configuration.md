@@ -28,6 +28,9 @@ privacy   = "summary"             # summary | category-only
 
 [training]
 collect = false         # opt-in: keep redacted endings locally for labelling (see design/model.md)
+
+[stats]
+enabled = true          # local idle ledger for `tap stats`; timings only, no message text
 ```
 
 > [!IMPORTANT]
@@ -50,6 +53,7 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 | `notify.ntfy.token_env` | unset | Environment variable that holds an ntfy access token |
 | `notify.ntfy.privacy` | `summary` | `category-only` leaves the summary out of the notification |
 | `training.collect` | `false` | Store redacted message endings locally for `tap label`. Never uploaded |
+| `stats.enabled` | `true` | Append one line per finished wait to `${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl` for `tap stats` (timestamps, category, close reason, project folder name unless `privacy = "category-only"`). Never uploaded. `false` writes nothing. User config only |
 
 ## Environment variables
 
