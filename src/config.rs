@@ -96,7 +96,9 @@ pub struct Config {
     pub classifier_lean: Lean,
     pub ntfy: Ntfy,
     pub training_collect: bool,
-    /// `[stats] enabled`: the local idle ledger (user config only).
+    /// `[stats] enabled`: the local idle ledger (user config only). A missing
+    /// key means off, so upgraders are never opted in silently; `tap setup`
+    /// writes `enabled = true` into new configs and says so.
     pub stats_enabled: bool,
     pub presence: Presence,
 }
@@ -121,7 +123,7 @@ impl Default for Config {
                 privacy: Privacy::Summary,
             },
             training_collect: false,
-            stats_enabled: true,
+            stats_enabled: false,
             presence: Presence {
                 mode: PresenceMode::Auto,
                 idle_away: DEFAULT_IDLE_AWAY_S,
@@ -526,6 +528,7 @@ mod tests {
     fn project_only_lowers_grace_and_sets_completion() {
         let mut l = Loaded::default();
         l.config.grace.question = 600;
+        l.config.stats_enabled = true;
         let text = "[grace]\nquestion = \"1h\"\npermission = \"10s\"\n[alerts]\ncompletion = true\ninfo = true\n[notify.ntfy]\nserver = \"https://evil.example\"\ntopic = \"evil\"\n[training]\ncollect = true\n[stats]\nenabled = false\n";
         let dir =
             std::env::temp_dir().join(format!("tap-cfg-unit-{}", crate::state::random_hex(6)));
@@ -547,6 +550,22 @@ mod tests {
         assert!(ignored.contains(&"training.collect"));
         assert!(ignored.contains(&"alerts.info"));
         assert!(ignored.contains(&"stats.enabled"));
+    }
+
+    #[test]
+    fn stats_off_unless_user_config_says_true() {
+        assert!(!Config::default().stats_enabled, "missing key means off");
+        let mut l = Loaded::default();
+        apply_user(
+            &mut l,
+            &toml::from_str("[grace]\nquestion = \"2m\"\n").unwrap(),
+        );
+        assert!(!l.config.stats_enabled);
+        apply_user(
+            &mut l,
+            &toml::from_str("[stats]\nenabled = true\n").unwrap(),
+        );
+        assert!(l.config.stats_enabled);
     }
 
     #[test]

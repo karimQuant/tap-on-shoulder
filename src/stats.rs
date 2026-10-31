@@ -351,6 +351,11 @@ pub fn line_count() -> Option<usize> {
 /// How to turn the ledger off, for setup and doctor.
 pub const OFF_HINT: &str = "turn off with `[stats] enabled = false` in the user config";
 
+/// How to turn the ledger on (it is off unless the user config says
+/// `[stats] enabled = true`), for setup, doctor, and `tap stats`.
+pub const ON_HINT: &str =
+    "turn on with `[stats] enabled = true` in the user config (a missing key means off)";
+
 /// `tap stats [--days N] [--json]`. Returns the exit code.
 pub fn run_cli(args: &[String]) -> i32 {
     const USAGE: &str = "usage: tap stats [--days N] [--json]";
@@ -429,7 +434,7 @@ pub fn run_cli(args: &[String]) -> i32 {
     }
     println!("Each wait counts at most 2 h. Local only, no message text.");
     if !cfg.stats_enabled {
-        println!("ledger: off (`[stats] enabled = false`); nothing new is recorded");
+        println!("ledger: off; nothing new is recorded; {ON_HINT}");
     }
     0
 }

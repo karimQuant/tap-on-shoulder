@@ -19,8 +19,14 @@ use support::*;
 const QUESTION: &str =
     "I can keep the legacy column or drop it.\n\nShould I drop the legacy `old_email` column?";
 
+/// The ledger is off unless the user config says `[stats] enabled = true`.
+const STATS_ON: &str = "[stats]\nenabled = true\n";
+
 fn env_for(url: &str) -> TestEnv {
     let mut env = TestEnv::new(url);
+    env.write_user_config(&format!(
+        "[notify.ntfy]\nserver = \"{url}\"\ntopic = \"tap-test-topic\"\n{STATS_ON}"
+    ));
     env.set("TAP_TEST_CLAUDE_PID", "none");
     env
 }
@@ -232,7 +238,7 @@ fn s15_stats_privacy_minimal_omits_project() {
     let mock = MockNtfy::start(Mode::Ok);
     let env = env_for(&mock.url);
     env.write_user_config(&format!(
-        "[notify.ntfy]\nserver = \"{}\"\ntopic = \"tap-test-topic\"\nprivacy = \"category-only\"\n",
+        "[notify.ntfy]\nserver = \"{}\"\ntopic = \"tap-test-topic\"\nprivacy = \"category-only\"\n{STATS_ON}",
         mock.url
     ));
     tapped_question(&env, &mock, "s15", 1);
@@ -263,6 +269,7 @@ fn s16_stats_disabled_writes_nothing() {
     let d = env.run(&["doctor"]);
     let dtext = String::from_utf8_lossy(&d.stdout);
     assert!(dtext.contains("stats: idle ledger off"), "{dtext}");
+    assert!(dtext.contains("[stats] enabled = true"), "{dtext}");
 
     // A project file cannot turn it back on.
     let proj = TempDir::new("tap-proj");
@@ -281,6 +288,31 @@ fn s16_stats_disabled_writes_nothing() {
     hook(&env, &u);
     assert!(!stats_dir(&env).exists());
     assert!(env.log_text().contains("project_key_ignored"));
+}
+
+#[test]
+fn s16b_stats_missing_key_means_off() {
+    // An upgrader's config has no `[stats]` table: nothing is recorded.
+    let mock = MockNtfy::start(Mode::Ok);
+    let mut env = TestEnv::new(&mock.url);
+    env.set("TAP_TEST_CLAUDE_PID", "none");
+    tapped_question(&env, &mock, "s16m", 1);
+    hook(&env, &user_prompt("s16m"));
+    assert!(!stats_dir(&env).exists(), "ledger written without consent");
+
+    let d = env.run(&["doctor"]);
+    let dtext = String::from_utf8_lossy(&d.stdout);
+    assert!(dtext.contains("stats: idle ledger off"), "{dtext}");
+    assert!(
+        dtext.contains("turn on with `[stats] enabled = true`"),
+        "{dtext}"
+    );
+
+    let s = env.run(&["stats"]);
+    let stext = String::from_utf8_lossy(&s.stdout);
+    assert!(s.status.success());
+    assert!(stext.contains("ledger: off"), "{stext}");
+    assert!(stext.contains("[stats] enabled = true"), "{stext}");
 }
 
 /// Tap + reply, then a second question that must still tap, with the ledger

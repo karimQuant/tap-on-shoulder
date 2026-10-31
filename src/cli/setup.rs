@@ -160,7 +160,7 @@ fn print_ledger_note(enabled: bool) {
             crate::stats::OFF_HINT
         );
     } else {
-        println!("idle ledger: off (`[stats] enabled = false`)");
+        println!("idle ledger: off; {}", crate::stats::ON_HINT);
     }
 }
 

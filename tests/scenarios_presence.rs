@@ -25,7 +25,7 @@ fn secs(n: f64) -> Duration {
 fn env_with(url: &str, grace: &str, away: &str, presence: Option<&str>) -> TestEnv {
     let mut env = TestEnv::new(url);
     env.write_user_config(&format!(
-        "[notify.ntfy]\nserver = \"{url}\"\ntopic = \"tap-test-topic\"\n[grace]\naway = \"{away}\"\n"
+        "[notify.ntfy]\nserver = \"{url}\"\ntopic = \"tap-test-topic\"\n[grace]\naway = \"{away}\"\n[stats]\nenabled = true\n"
     ));
     env.set("TAP_TEST_CLAUDE_PID", "none");
     env.set("TAP_GRACE_OVERRIDE", grace);

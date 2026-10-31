@@ -35,7 +35,7 @@ privacy   = "summary"             # summary | category-only
 collect = false         # opt-in: keep redacted endings locally for labelling (see design/model.md)
 
 [stats]
-enabled = true          # local idle ledger for `tap stats`; timings only, no message text
+enabled = true          # local idle ledger for `tap stats`; timings only, no message text (setup writes true; a missing key means off)
 ```
 
 > [!IMPORTANT]
@@ -61,7 +61,7 @@ enabled = true          # local idle ledger for `tap stats`; timings only, no me
 | `notify.ntfy.token_env` | unset | Environment variable that holds an ntfy access token |
 | `notify.ntfy.privacy` | `summary` | `category-only` leaves the summary out of the notification |
 | `training.collect` | `false` | Store redacted message endings locally for `tap label`. Never uploaded |
-| `stats.enabled` | `true` | Append one line per finished wait to `${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl` for `tap stats` (timestamps, category, close reason, project folder name unless `privacy = "category-only"`). Never uploaded. `false` writes nothing. User config only |
+| `stats.enabled` | `false` (setup writes `true`) | Append one line per finished wait to `${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl` for `tap stats` (timestamps, category, close reason, project folder name unless `privacy = "category-only"`). Never uploaded. A missing key means off, so a config written before v0.2 records nothing until you add `enabled = true`; `tap setup` writes `true` into new configs and says so, and `tap doctor` reports which applies. `false` writes nothing. User config only |
 
 ## Environment variables
 

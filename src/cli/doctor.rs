@@ -80,14 +80,17 @@ pub fn run() -> i32 {
     }
 }
 
-/// The idle ledger: on/off, path, line count, how to turn it off.
+/// The idle ledger: on/off, path, line count, how to turn it off or on.
 fn report_stats(c: &crate::config::Config) {
     use crate::stats;
     let path = stats::ledger_path()
         .map(|p| p.display().to_string())
         .unwrap_or_else(|| "(CLAUDE_PLUGIN_DATA unset)".into());
     if !c.stats_enabled {
-        println!("stats: idle ledger off; {path} is not written");
+        println!(
+            "stats: idle ledger off; {path} is not written; {}",
+            stats::ON_HINT
+        );
         return;
     }
     let lines = stats::line_count().unwrap_or(0);
