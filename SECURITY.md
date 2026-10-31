@@ -8,7 +8,7 @@ Include what you found, how to reproduce it, and the impact you expect. We aim t
 
 ## Supported versions
 
-Only the latest release will receive security fixes. The project is in alpha (`0.1.0-alpha.1`).
+Only the latest release will receive security fixes. The project is in alpha (`0.2.0-alpha.1`).
 
 ## In scope
 

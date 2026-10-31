@@ -1,6 +1,6 @@
 {
   "name": "tap-on-shoulder",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-alpha.1",
   "description": "Taps you on the shoulder (an ntfy push) when a Claude Code session has been waiting on you for a while. Observe-only: it never approves, types, or wakes Claude.",
   "author": {
     "name": "karimQuant",

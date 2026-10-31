@@ -358,7 +358,7 @@ dependencies = [
 
 [[package]]
 name = "tap-on-shoulder"
-version = "0.1.0-alpha.1"
+version = "0.2.0-alpha.1"
 dependencies = [
  "getrandom 0.3.4",
  "libc",

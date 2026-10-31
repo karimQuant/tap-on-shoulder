@@ -15,7 +15,7 @@ There are two ways in:
 | Model parity | `TAP_REQUIRE_MODEL=embed cargo test --test parity`: the Rust tokenizer and classifier agree with the Python pipeline on 72 fixtures (identical token ids and labels, probability difference < 1e-3) | Locally, and in the CI model job | Pass |
 | Classifier quality gate | `python model/train.py --report`: grouped 5-fold cross-validation on 1,637 **synthetic** endings | Locally, and in the CI model job | tap-recall 0.958 (gate 0.95), macro-F1 0.868 (gate 0.85) |
 | Real Claude Code end-to-end | `scripts/e2e.sh`: a real interactive `claude` in tmux with the plugin loaded. It checks for exactly 1 tap on a question, no second tap after a "done" reply, and 0 taps from `claude -p` | Locally only (it needs your Claude login) | Pass |
-| Release | `release.yml` on tag `bin-v0.1.0-alpha.1`: builds `tap` with the model embedded for Linux and macOS on x64 and arm64, attests provenance, publishes a prerelease | GitHub Actions | Published. All 4 binaries pass `gh attestation verify` and match the checksums pinned in `scripts/checksums.txt` |
+| Release | `release.yml` on tags `bin-v0.1.0-alpha.1` and `bin-v0.2.0-alpha.1`: builds `tap` with the model embedded for Linux and macOS on x64 and arm64, attests provenance, publishes a prerelease | GitHub Actions | Published. All 4 binaries pass `gh attestation verify` and match the checksums pinned in `scripts/checksums.txt` |
 | Security checks | gitleaks over the full history, a commit-message and file leak scanner, `cargo deny`, shellcheck, and `claude plugin validate` | CI on every push | Pass |
 
 **Not tested yet:**
@@ -116,7 +116,7 @@ To check a classification without running a session:
 echo "Should I keep the legacy column or drop it?" | scripts/tap.sh classify
 ```
 
-`scripts/tap.sh` is in your checkout. After a marketplace install, call the binary directly: `~/.claude/plugins/data/tap-on-shoulder-tap-on-shoulder/bin/tap-0.1.0-alpha.1 classify`.
+`scripts/tap.sh` is in your checkout. After a marketplace install, call the binary directly: `~/.claude/plugins/data/tap-on-shoulder-tap-on-shoulder/bin/tap-0.2.0-alpha.1 classify`.
 
 **Known gap:** pressing Esc, or answering "No", at a permission prompt fires no hook event. If you then walk away, you may still get one tap.
 

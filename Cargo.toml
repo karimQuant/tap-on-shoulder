@@ -1,6 +1,6 @@
 [package]
 name = "tap-on-shoulder"
-version = "0.1.0-alpha.1"
+version = "0.2.0-alpha.1"
 edition = "2021"
 rust-version = "1.80"
 description = "Claude Code plugin that taps you when a session has been waiting on you."
