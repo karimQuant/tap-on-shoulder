@@ -69,9 +69,9 @@ Bound episodes are tied to a tool: one call (`tool_use_id`), a set of candidate 
 - **Shutdown.** When no episode is open, release the lock and **re-scan once**. Exit only if the second scan is also empty. This closes the race with a hook that opens an episode during shutdown.
 - **Policy is applied in the hook.** The `done` / `info` suppression happens at classification time in the hook (see `Stop` above), so the sweeper only ever sees episodes that may tap. At due time it re-checks liveness and delivery state:
 - **When an episode is due**, check in order:
-  1. **Session gone?** The recorded `claude` process (pid plus start time) has exited or is a zombie → close as `session_gone`. Hooks detect `claude` once per session and store it; they detect again only when the stored process is gone. Every `ps` call runs with `LC_ALL=C TZ=UTC0`.
+  1. **Session gone?** The recorded `claude` process (pid plus start time) has exited or is a zombie → close as `session_gone`. Hooks detect `claude` once per session and store it; they detect again only when the stored process is gone. Every `ps` call runs as `/bin/ps` with `LC_ALL=C TZ=UTC0`.
   2. **Permission tool running?** For `needs_permission`: a process descended from `claude` that started at or after `bound_at + 1 s` is alive in two samples taken 2 s apart → postpone 30 s, up to a total of 10 minutes. The extra second is the minimum time a human takes to approve, so a parallel tool started just before the prompt does not count.
-  3. **Claim.** Under the session lock, move `open` → `sending{attempt}`, only if the episode is still the same one and is still due (`now ≥ max(due_at, retry_at)`).
+  3. **Claim.** Under the session lock, move `open` → `sending{attempt}`, only if the episode is still the same one and is still due (`now ≥ eff_due`, which is `max(due_at, retry_at)` unless the user is away; see below). The claim records `sent_early`.
   4. **Send**, then record the result:
 
      | Outcome | New state |
@@ -82,6 +82,7 @@ Bound episodes are tied to a tool: one call (`tool_use_id`), a set of candidate 
      | Timeout or dropped connection after the request was written | `sent_uncertain`, not retried |
 
   The result is written only if the episode is still `sending` with the same attempt. A close that lands during the send always wins.
+- **Away-aware taps (v0.2).** Every due check (the scan, the claim re-check, the wake time) uses `eff_due` from [contract.md](contract.md#state-schema): when the user is away, an episode is due at `opened_at + grace.away` instead of `due_at`. Presence comes from `src/presence.rs` (GNOME `gdbus`, macOS `ioreg`; absolute paths, cleared env, 500 ms timeout, strict parsing, cached 5 s). It is probed at most once per pass, and only while an episode is inside its away window. Unknown presence, `presence.mode = "off"`, SSH sessions, and postponed permission taps all keep v0.1 timing. A rebind resets `opened_at`, so it also restarts the away window.
 - **Stale claims.** A `sending` state older than 2 minutes becomes `sent_uncertain`. Delivery is **at most once**: we would rather lose a tap than send it twice.
 
 ## State

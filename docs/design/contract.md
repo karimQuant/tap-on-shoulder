@@ -142,7 +142,16 @@ The state schema is `SessionState` in `src/contract.rs` (`STATE_VERSION = 1`). I
 
 - `pending_tools[{tool_use_id, tool_name, input_hash}]`
 - `claude{pid, start}`
-- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, candidate_ids, bound_tool_name, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason}`
+- `episode{id, status: open|sending|notified|sent_uncertain|failed|closed, category, summary, trigger, tool_use_id, candidate_ids, bound_tool_name, opened_at, bound_at, due_at, confirmed_at, attempts, retry_at, sending_since, postponed_s, closed_reason, grace_away_s, sent_early}`
+
+**Away-aware fields (v0.2, both `#[serde(default)]`, so v0.1 state still loads):**
+
+- **`grace_away_s`:** the effective `grace.away` in seconds, set by the hook whenever it sets `due_at` (project config may shorten it). `null` when the hook ran in an SSH session, and in v0.1 state: such an episode ignores presence.
+- **`sent_early`:** set at every claim (`open` → `sending`) to `now < due_at`. It is true only when the claim happened before the normal grace because the user was away, and it stays with the final status (`notified`, `sent_uncertain`, `failed`, or `open` for a retry). The idle ledger writes it as `early`.
+
+**Effective due time.** The sweeper's due check, its claim re-check, and its wake time all use one rule (`sweep::eff_due`):
+`max(retry_at, if postponed_s > 0 or grace_away_s is null or not away { due_at } else { min(due_at, opened_at + grace_away_s) })`.
+*Away* is true only when `presence.mode = "auto"` and the probe reads away (screen locked, or input idle ≥ `presence.idle_away`); unknown is treated as present, which is exactly v0.1. The probe runs at most once per sweeper pass and only if some open episode is inside `[opened_at + grace_away_s, due_at)`.
 
 **Write guard:** the sweeper writes `notified`, `failed`, or `sent_uncertain` only if the episode still has the same `id` and is still `sending` with the same `attempts`. A hook that closes the episode while a send is in flight always wins.
 

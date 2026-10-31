@@ -9,14 +9,18 @@
 //!   if the episode is still due), send
 //!   without the lock, then `notified | open(retry) | failed | sent_uncertain`
 //!   only if the episode is still the same `sending` one (write guard).
+//! - Away-aware (v0.2): every due check goes through [`eff_due`]. Presence is
+//!   probed at most once per pass, and only when an open episode is inside
+//!   its away window (`opened_at + grace.away ≤ now < due_at`).
 
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::config;
+use crate::config::{self, Config, PresenceMode};
 use crate::contract::{Category, Episode, EpisodeStatus, Notifier, SendError, SessionState};
 use crate::log::Entry;
 use crate::notify::{self, NtfyNotifier};
+use crate::presence::{self, Presence};
 use crate::state::{self, FileLock, Loaded, Store};
 
 const MAX_SLEEP_MS: i64 = 5_000;
@@ -115,6 +119,46 @@ pub fn run() {
     Entry::new("sweep").transition("exited").write();
 }
 
+/// The earliest time an episode may tap. With `away` false (unknown,
+/// present, or `presence.mode = "off"`) this is v0.1's
+/// `max(due_at, retry_at)`. A postponed permission tap ignores presence, so
+/// postponement cannot loop. An episode without `grace_away_s` (armed over
+/// SSH, or by v0.1) ignores presence too.
+pub fn eff_due(ep: &Episode, away: bool) -> i64 {
+    let due = match ep.grace_away_s {
+        Some(g) if away && ep.postponed_s == 0 => ep.due_at.min(ep.opened_at + g),
+        _ => ep.due_at,
+    };
+    due.max(ep.retry_at.unwrap_or(0))
+}
+
+/// `[opened_at + grace.away, due_at)`: when presence could change the due
+/// time. `None` when it never can.
+fn away_window(ep: &Episode, cfg: &Config) -> Option<(i64, i64)> {
+    if cfg.presence.mode == PresenceMode::Off || ep.postponed_s > 0 {
+        return None;
+    }
+    let start = ep.opened_at + ep.grace_away_s?;
+    (start < ep.due_at).then_some((start, ep.due_at))
+}
+
+/// Per-pass context: the user config and at most one presence reading.
+struct Pass {
+    cfg: Config,
+    away: Option<bool>,
+}
+
+impl Pass {
+    fn away(&mut self, ep: &Episode, now: i64) -> bool {
+        match away_window(ep, &self.cfg) {
+            Some((start, end)) if start <= now && now < end => *self
+                .away
+                .get_or_insert_with(|| presence::current(&self.cfg) == Presence::Away),
+            _ => false,
+        }
+    }
+}
+
 fn short(e: Entry, sid: &str, ep: &Episode) -> Entry {
     e.session(sid).episode(&ep.id).category(ep.category)
 }
@@ -124,8 +168,12 @@ impl Sweeper {
     /// `None` when nothing is pending.
     fn pass(&mut self) -> Option<i64> {
         let mut wake: Option<i64> = None;
+        let mut pass = Pass {
+            cfg: config::load(None).config,
+            away: None,
+        };
         for sid in self.store.sessions() {
-            if let Some(t) = self.session(&sid) {
+            if let Some(t) = self.session(&sid, &mut pass) {
                 wake = Some(wake.map_or(t, |w| w.min(t)));
             }
         }
@@ -199,7 +247,7 @@ impl Sweeper {
         }
     }
 
-    fn session(&mut self, sid: &str) -> Option<i64> {
+    fn session(&mut self, sid: &str, pass: &mut Pass) -> Option<i64> {
         let snap = self.snapshot(sid)?;
         let ep = snap.episode.clone()?;
         let now = state::now();
@@ -215,9 +263,15 @@ impl Sweeper {
             EpisodeStatus::Open => {}
             _ => return None,
         }
-        let due = ep.due_at.max(ep.retry_at.unwrap_or(0));
+        let away = pass.away(&ep, now);
+        let due = eff_due(&ep, away);
         if now < due {
-            return Some(due * 1000);
+            // Wake when the away window opens, to probe presence then.
+            let wake = match away_window(&ep, &pass.cfg) {
+                Some((start, _)) if now < start => due.min(start.max(ep.retry_at.unwrap_or(0))),
+                _ => due,
+            };
+            return Some(wake * 1000);
         }
 
         // D4/R6: session liveness.
@@ -259,11 +313,11 @@ impl Sweeper {
             }
         }
 
-        self.deliver(sid, &snap.project, &ep)
+        self.deliver(sid, &snap.project, &ep, away)
     }
 
     /// Claim, send, and record the result.
-    fn deliver(&self, sid: &str, project: &str, ep: &Episode) -> Option<i64> {
+    fn deliver(&self, sid: &str, project: &str, ep: &Episode, away: bool) -> Option<i64> {
         let cfg = config::load(None).config;
         let notifier = match NtfyNotifier::new(&cfg.ntfy) {
             Ok(n) => n,
@@ -290,20 +344,23 @@ impl Sweeper {
         // Re-check the due time under the lock: a hook may have re-armed or
         // rebound the episode since the snapshot.
         let claimed = self.guarded(sid, &ep.id, EpisodeStatus::Open, ep.attempts, |e| {
-            if now < e.due_at.max(e.retry_at.unwrap_or(0)) {
+            if now < eff_due(e, away) {
                 return false;
             }
             e.status = EpisodeStatus::Sending;
             e.sending_since = Some(now);
+            e.sent_early = now < e.due_at;
             true
         });
         let Some(claimed) = claimed else {
             // Changed or not due any more; look again soon.
             return Some(state::now_ms());
         };
-        short(Entry::new("sweep"), sid, &claimed)
-            .transition("sending")
-            .write();
+        let mut entry = short(Entry::new("sweep"), sid, &claimed).transition("sending");
+        if claimed.sent_early {
+            entry = entry.kind("away");
+        }
+        entry.write();
 
         let tap = notify::tap_for(project, &claimed, now, cfg.ntfy.privacy);
         let result = notifier.send(&tap);
@@ -367,5 +424,56 @@ fn status_name(s: EpisodeStatus) -> &'static str {
         EpisodeStatus::SentUncertain => "sent_uncertain",
         EpisodeStatus::Failed => "failed",
         EpisodeStatus::Closed => "closed",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ep(opened: i64, due: i64, away_s: Option<i64>) -> Episode {
+        serde_json::from_value(serde_json::json!({
+            "id": "ab", "status": "open", "category": "needs_decision", "summary": "",
+            "trigger": "Stop", "tool_use_id": null, "opened_at": opened, "due_at": due,
+            "grace_away_s": away_s,
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn eff_due_rules() {
+        let e = ep(100, 400, Some(30));
+        assert_eq!(eff_due(&e, false), 400, "present/unknown: v0.1");
+        assert_eq!(eff_due(&e, true), 130, "away: opened + grace.away");
+        let mut r = e.clone();
+        r.retry_at = Some(150);
+        assert_eq!(eff_due(&r, true), 150, "retry_at still applies");
+        assert_eq!(eff_due(&r, false), 400);
+        let mut p = e.clone();
+        p.postponed_s = 30;
+        assert_eq!(eff_due(&p, true), 400, "postponed ignores presence");
+        // v0.1 state (no grace_away_s) and SSH sessions ignore presence.
+        let old: Episode = serde_json::from_value(serde_json::json!({
+            "id": "ab", "status": "open", "category": "blocked", "summary": "",
+            "trigger": "Stop", "tool_use_id": null, "opened_at": 100, "due_at": 400,
+        }))
+        .unwrap();
+        assert_eq!(old.grace_away_s, None);
+        assert!(!old.sent_early);
+        assert_eq!(eff_due(&old, true), 400);
+        assert_eq!(eff_due(&ep(100, 400, None), true), 400);
+    }
+
+    #[test]
+    fn away_window_only_when_it_can_matter() {
+        let mut cfg = Config::default();
+        assert_eq!(away_window(&ep(100, 400, Some(30)), &cfg), Some((130, 400)));
+        assert_eq!(away_window(&ep(100, 400, None), &cfg), None);
+        assert_eq!(away_window(&ep(100, 130, Some(30)), &cfg), None);
+        let mut p = ep(100, 400, Some(30));
+        p.postponed_s = 1;
+        assert_eq!(away_window(&p, &cfg), None);
+        cfg.presence.mode = PresenceMode::Off;
+        assert_eq!(away_window(&ep(100, 400, Some(30)), &cfg), None);
     }
 }

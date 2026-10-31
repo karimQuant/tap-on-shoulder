@@ -10,6 +10,11 @@ The configuration lives in `~/.config/tap-on-shoulder/config.toml` (or under `$X
 question   = "5m"       # needs_decision
 permission = "5m"       # needs_permission
 blocked    = "5m"       # blocked (API error, missing credentials, …)
+away       = "30s"      # grace while you are away; must be ≤ every grace above
+
+[presence]              # away-aware taps (v0.2)
+mode      = "auto"      # auto | off ("off" = always the normal grace)
+idle_away = "5m"        # input idle this long counts as away (a locked screen always does)
 
 [alerts]
 completion = false      # tap when a task finishes successfully?
@@ -31,7 +36,7 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 ```
 
 > [!IMPORTANT]
-> **Project config is restricted.** A project file at `<repo>/.claude/tap-on-shoulder.toml` may only *shorten* `grace.*` values and set `alerts.completion`. Every other key is ignored with a warning, so a cloned repository can't redirect your notifications, hide taps, or turn on data collection.
+> **Project config is restricted.** A project file at `<repo>/.claude/tap-on-shoulder.toml` may only *shorten* `grace.*` values (including `grace.away`) and set `alerts.completion`. `presence.*` is user config only. Every other key is ignored with a warning, so a cloned repository can't redirect your notifications, hide taps, or turn on data collection.
 
 ## Reference
 
@@ -40,6 +45,9 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 | `grace.question` | `5m` | Time a session must wait on a question before a tap |
 | `grace.permission` | `5m` | Same, for permission prompts |
 | `grace.blocked` | `5m` | Same, for errors and external blockers |
+| `grace.away` | `30s` | Grace when you are away (1s–24h). Must not exceed any category grace: a larger user value is a config error and the default is used. Every layer is clamped to the smallest category grace |
+| `presence.mode` | `auto` | `auto`: probe whether you are away (GNOME: screen lock and input idle via `gdbus`; macOS: input idle via `ioreg`). `off`: never probe; every tap uses the normal grace. User config only |
+| `presence.idle_away` | `5m` | Input idle this long counts as away (10s–24h). User config only |
 | `alerts.completion` | `false` | Also tap when a task finishes |
 | `alerts.info` | `false` | Also tap on informational stops |
 | `alerts.repeat` | `off` | Re-notify interval for the same episode (later release) |
@@ -55,7 +63,11 @@ collect = false         # opt-in: keep redacted endings locally for labelling (s
 
 | Variable | Purpose |
 |---|---|
-| `TAP_GRACE_OVERRIDE` | Overrides every grace period (1s–24h), e.g. `TAP_DEV=1 TAP_GRACE_OVERRIDE=10s` for testing. Ignored, with an `env_ignored` log entry, unless `TAP_DEV=1` is also set |
+| `TAP_GRACE_OVERRIDE` | Overrides every category grace period (1s–24h), e.g. `TAP_DEV=1 TAP_GRACE_OVERRIDE=10s` for testing. It never raises `grace.away`, only clamps it to the override. Ignored, with an `env_ignored` log entry, unless `TAP_DEV=1` is also set |
 | `TAP_NTFY_TOKEN` | ntfy access token, if you set `token_env` to this name |
+
+## Away-aware taps
+
+When an episode has waited `grace.away` and you are **away** (screen locked, or no keyboard/mouse input for `presence.idle_away`), the tap goes out then instead of at the full grace. Present or *unknown* (no probe on this platform, a probe error or timeout, `presence.mode = "off"`) always means the normal grace, exactly as in v0.1. Presence is ignored for sessions whose hooks run over SSH (`SSH_CONNECTION`, `SSH_CLIENT` or `SSH_TTY` set), because the local screen says nothing about a remote user; a `tmux` session started locally and attached over SSH cannot be told apart. A postponed permission tap (an approved tool is running) also ignores presence. `tap doctor` shows the probe source, the current reading, and the effective `grace.away`.
 
 Secrets never go in the config file. Reference them through environment variables instead.

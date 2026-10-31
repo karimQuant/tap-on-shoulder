@@ -34,6 +34,7 @@ pub fn run() -> i32 {
     }
     let c = &loaded.config;
     report_classifier(c);
+    report_presence(c);
     println!(
         "grace: question {}s, permission {}s, blocked {}s; alerts: completion {}, info {}",
         c.grace.question, c.grace.permission, c.grace.blocked, c.alerts_completion, c.alerts_info
@@ -104,6 +105,44 @@ fn report_classifier(c: &crate::config::Config) {
             println!("{line}");
         }
         Err(_) => println!("head: unreadable"),
+    }
+}
+
+/// Presence source, current reading, and the effective away grace.
+fn report_presence(c: &crate::config::Config) {
+    use crate::config::PresenceMode;
+    use crate::presence;
+    if c.presence.mode == PresenceMode::Off {
+        println!(
+            "presence: off (normal grace only); grace.away {}s unused",
+            c.grace.away
+        );
+        return;
+    }
+    let raw = presence::probe();
+    let reading = raw.presence(c.presence.idle_away);
+    let idle = raw
+        .idle_ms
+        .map_or_else(|| "unknown".to_string(), |ms| format!("{}s", ms / 1000));
+    let locked = match raw.locked {
+        Some(true) => "yes",
+        Some(false) => "no",
+        None => "unknown",
+    };
+    let timeout = if raw.timed_out {
+        " (probe timed out)"
+    } else {
+        ""
+    };
+    println!(
+        "presence: source {}, reading {}{timeout}, idle {idle}, locked {locked}; grace.away {}s, idle_away {}s",
+        presence::source(),
+        reading.as_str(),
+        c.grace.away,
+        c.presence.idle_away
+    );
+    if presence::remote_session() {
+        println!("presence: SSH session: Claude sessions started from here ignore presence");
     }
 }
 

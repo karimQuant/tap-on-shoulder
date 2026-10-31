@@ -347,6 +347,7 @@ impl Ctx<'_> {
                 }
             }
             ep.due_at = ep.opened_at + self.cfg.grace_for(ep.category) as i64;
+            ep.grace_away_s = crate::presence::grace_away(self.cfg);
             transition = if rebind { "rebound" } else { "rearmed" };
         } else {
             let grace = self.cfg.grace_for(category) as i64;
@@ -368,6 +369,8 @@ impl Ctx<'_> {
                 sending_since: None,
                 postponed_s: 0,
                 closed_reason: None,
+                grace_away_s: crate::presence::grace_away(self.cfg),
+                sent_early: false,
             };
             set_binding(&mut ep, binding);
             self.state.episode = Some(ep);
