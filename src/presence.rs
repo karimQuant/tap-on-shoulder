@@ -231,6 +231,9 @@ fn gdbus(addr: &str, dest: &str, path: &str, method: &str) -> Command {
     c.args([
         "call",
         "--session",
+        // gdbus's own timeout, so a child we failed to reap exits in 1 s.
+        "--timeout",
+        "1",
         "--dest",
         dest,
         "--object-path",
@@ -244,30 +247,80 @@ fn gdbus(addr: &str, dest: &str, path: &str, method: &str) -> Command {
     c
 }
 
-/// `DBUS_SESSION_BUS_ADDRESS` if set (sane length, no control characters),
-/// else `unix:path=$XDG_RUNTIME_DIR/bus` only if that path is a socket owned
-/// by our uid.
+/// The session bus to probe: `DBUS_SESSION_BUS_ADDRESS` if it passes
+/// [`valid_env_address`], else `unix:path=$XDG_RUNTIME_DIR/bus` if that is a
+/// socket owned by our uid, else `None` (presence unknown).
 pub fn bus_address() -> Option<String> {
-    if let Ok(a) = std::env::var("DBUS_SESSION_BUS_ADDRESS") {
-        if !a.is_empty() && a.len() <= 1024 && !a.chars().any(|c| c.is_control()) {
-            return Some(a);
-        }
+    let env = std::env::var("DBUS_SESSION_BUS_ADDRESS").ok();
+    let runtime = std::env::var_os("XDG_RUNTIME_DIR");
+    resolve_bus_address(env.as_deref(), runtime.as_deref().map(Path::new))
+}
+
+/// [`bus_address`] with its inputs passed in.
+pub fn resolve_bus_address(env: Option<&str>, runtime_dir: Option<&Path>) -> Option<String> {
+    if let Some(a) = env.and_then(valid_env_address) {
+        return Some(a.to_string());
     }
-    let dir = std::env::var_os("XDG_RUNTIME_DIR")?;
-    let dir = Path::new(&dir);
+    let dir = runtime_dir?;
     if !dir.is_absolute() {
         return None;
     }
     let sock = dir.join("bus");
     let s = sock.to_str()?;
-    if s.chars().any(|c| c.is_control() || c == ',' || c == ';') {
+    if !plain_path(s) {
         return None;
     }
+    owned_socket(&sock).then(|| format!("unix:path={s}"))
+}
+
+/// Accepts exactly one address: `unix:path=<absolute>` whose target (not
+/// followed if a symlink) is a socket owned by our uid, or
+/// `unix:abstract=<name>`, either optionally followed by `,guid=<32 hex>`.
+/// Anything else (`tcp:`, `nonce-tcp:`, `unixexec:`, `;`-separated lists,
+/// other keys, escapes) is rejected, so a hostile environment cannot point
+/// gdbus at a remote bus or make it run a program.
+pub fn valid_env_address(a: &str) -> Option<&str> {
+    if a.is_empty() || a.len() > 1024 || a.contains(';') {
+        return None;
+    }
+    let mut parts = a.strip_prefix("unix:")?.split(',');
+    let first = parts.next()?;
+    let mut guid = false;
+    for p in parts {
+        let g = p.strip_prefix("guid=")?;
+        if guid || g.len() != 32 || !g.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return None;
+        }
+        guid = true;
+    }
+    if let Some(path) = first.strip_prefix("path=") {
+        (path.starts_with('/') && plain_path(path) && owned_socket(Path::new(path))).then_some(a)
+    } else if let Some(name) = first.strip_prefix("abstract=") {
+        (!name.is_empty()
+            && name
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b"-_./".contains(&b)))
+        .then_some(a)
+    } else {
+        None
+    }
+}
+
+/// No control characters and none of the D-Bus address metacharacters.
+fn plain_path(s: &str) -> bool {
+    !s.chars()
+        .any(|c| c.is_control() || matches!(c, ',' | ';' | '%' | '='))
+}
+
+/// `p` itself (a symlink is not followed) is a socket owned by our uid.
+fn owned_socket(p: &Path) -> bool {
     use std::os::unix::fs::{FileTypeExt, MetadataExt};
-    let md = std::fs::symlink_metadata(&sock).ok()?;
+    let Ok(md) = std::fs::symlink_metadata(p) else {
+        return false;
+    };
     // SAFETY: getuid has no preconditions.
     let uid = unsafe { libc::getuid() };
-    (md.file_type().is_socket() && md.uid() == uid).then(|| format!("unix:path={s}"))
+    md.file_type().is_socket() && md.uid() == uid
 }
 
 /// `(uint64 4658188851,)` → 4658188851. Exactly that shape, nothing else.
@@ -438,6 +491,82 @@ fn kill_group(child: &mut Child) {
 mod tests {
     use super::*;
     use crate::config::DEFAULT_IDLE_AWAY_S;
+
+    /// A temp dir holding a socket we own, a regular file, and a symlink to
+    /// the socket.
+    fn bus_fixture() -> (std::path::PathBuf, std::os::unix::net::UnixListener) {
+        let dir =
+            std::env::temp_dir().join(format!("tap-bus-unit-{}", crate::state::random_hex(6)));
+        std::fs::create_dir_all(&dir).unwrap();
+        let l = std::os::unix::net::UnixListener::bind(dir.join("bus")).unwrap();
+        std::fs::write(dir.join("file"), b"").unwrap();
+        std::os::unix::fs::symlink(dir.join("bus"), dir.join("link")).unwrap();
+        (dir, l)
+    }
+
+    #[test]
+    fn bus_address_env_validation() {
+        let (dir, _l) = bus_fixture();
+        let sock = format!("unix:path={}/bus", dir.display());
+        let guid = format!("{sock},guid=0123456789abcdef0123456789abcdef");
+        assert_eq!(valid_env_address(&sock), Some(sock.as_str()));
+        assert_eq!(valid_env_address(&guid), Some(guid.as_str()));
+        assert!(valid_env_address("unix:abstract=/tmp/dbus-XYZ").is_some());
+        assert!(valid_env_address(
+            "unix:abstract=/tmp/dbus-X,guid=0123456789abcdef0123456789abcdef"
+        )
+        .is_some());
+        for bad in [
+            "tcp:host=evil.example,port=1234".to_string(),
+            "nonce-tcp:host=127.0.0.1,port=1,noncefile=/tmp/n".into(),
+            "unixexec:path=/bin/sh,argv1=-c".into(),
+            "autolaunch:".into(),
+            format!("{sock};tcp:host=evil.example,port=1"),
+            format!("unix:path={}/file", dir.display()),
+            format!("unix:path={}/link", dir.display()),
+            format!("unix:path={}/missing", dir.display()),
+            "unix:path=relative/bus".into(),
+            format!("{sock},guid=xyz"),
+            format!("{sock},guid=0123456789abcdef0123456789abcdef,guid=0123456789abcdef0123456789abcdef"),
+            format!("{sock},noncefile=/tmp/n"),
+            format!("unix:path={}/b%75s", dir.display()),
+            "unix:tmpdir=/tmp".into(),
+            "unix:abstract=".into(),
+            "unix:abstract=a b".into(),
+            String::new(),
+        ] {
+            assert_eq!(valid_env_address(&bad), None, "{bad}");
+        }
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
+    fn bus_address_falls_back_to_owned_runtime_socket() {
+        let (dir, _l) = bus_fixture();
+        let fallback = format!("unix:path={}/bus", dir.display());
+        assert_eq!(
+            resolve_bus_address(Some("tcp:host=evil.example,port=1"), Some(&dir)),
+            Some(fallback.clone()),
+            "tcp: rejected, owned runtime socket used"
+        );
+        assert_eq!(resolve_bus_address(None, Some(&dir)), Some(fallback));
+        let other = dir.join("file");
+        assert_eq!(
+            resolve_bus_address(Some("tcp:host=evil.example,port=1"), Some(&other)),
+            None,
+            "no owned socket: unknown"
+        );
+        assert_eq!(
+            resolve_bus_address(Some("tcp:host=evil.example,port=1"), None),
+            None
+        );
+        assert_eq!(resolve_bus_address(None, Some(Path::new("relative"))), None);
+        assert_eq!(
+            resolve_bus_address(Some("unix:abstract=/tmp/dbus-1"), None).as_deref(),
+            Some("unix:abstract=/tmp/dbus-1")
+        );
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 
     #[test]
     fn gdbus_uint64() {

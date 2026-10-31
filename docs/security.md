@@ -58,7 +58,9 @@ With `presence.mode = "auto"` (the default) the sweeper asks, at most once per p
 - **GNOME:** `/usr/bin/gdbus call --session` to `org.gnome.Mutter.IdleMonitor.GetIdletime` and `org.gnome.ScreenSaver.GetActive`.
 - **macOS:** `/usr/sbin/ioreg -c IOHIDSystem -d 4 -k HIDIdleTime`.
 
-Each command runs by absolute path with an empty environment (only `LC_ALL=C` and, for gdbus, `DBUS_SESSION_BUS_ADDRESS`; the `$XDG_RUNTIME_DIR/bus` fallback is used only if it is a socket owned by you), stdin and stderr closed, stdout capped at 4 KiB, and is killed after 500 ms. Output must be exactly one integer or boolean in the expected shape; anything else reads as *unknown*, which means the normal grace. Nothing is sent anywhere. `presence.mode = "off"` disables the probes. The existing `ps` calls run as `/bin/ps` for the same reason: `PATH` is not trusted.
+The bus address handed to gdbus is checked first. `DBUS_SESSION_BUS_ADDRESS` from the environment is used only if it is a single `unix:path=<absolute path>` whose target (a symlink is not followed) is a socket owned by you, or a single `unix:abstract=<name>`, optionally with a `guid=`. Anything else (`tcp:`, `nonce-tcp:`, `unixexec:`, several `;`-separated addresses, other keys or escapes) is ignored. Then `$XDG_RUNTIME_DIR/bus` is used only if it is a socket owned by you; failing both, presence is *unknown*. gdbus also gets `--timeout 1`, so a call that outlives its 500 ms kill cannot linger.
+
+Each command runs by absolute path with an empty environment (only `LC_ALL=C` and, for gdbus, `DBUS_SESSION_BUS_ADDRESS`), stdin and stderr closed, stdout capped at 4 KiB, and is killed after 500 ms. Output must be exactly one integer or boolean in the expected shape; anything else reads as *unknown*, which means the normal grace. Nothing is sent anywhere. `presence.mode = "off"` disables the probes. The existing `ps` calls run as `/bin/ps` for the same reason: `PATH` is not trusted.
 
 ## Threat model
 
