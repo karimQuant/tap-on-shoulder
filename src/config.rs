@@ -3,9 +3,14 @@
 //! 1. User config: `${XDG_CONFIG_HOME:-~/.config}/tap-on-shoulder/config.toml`.
 //! 2. Project config: `<cwd>/.claude/tap-on-shoulder.toml` (≤ 64 KiB). Only
 //!    `grace.*` (clamped to the user's value or lower) and `alerts.completion`
-//!    are honoured; every other key (including `stats.*`) is ignored with a
-//!    warning.
-//! 3. `TAP_GRACE_OVERRIDE` replaces every grace period, only with `TAP_DEV=1`.
+//!    are honoured; every other key (including `stats.*` and `presence.*`)
+//!    is ignored with a warning. `grace.away` is also allowed there,
+//!    shorten-only.
+//! 3. `TAP_GRACE_OVERRIDE` replaces every category grace period, only with
+//!    `TAP_DEV=1`. It never raises `grace.away`; it can only clamp it down.
+//!
+//! `grace.away` never exceeds any category grace: a user value above one is
+//! a config error, and every layer's result is clamped to the minimum.
 
 use std::path::{Path, PathBuf};
 
@@ -14,6 +19,12 @@ use crate::contract::Category;
 pub const GRACE_MIN_S: u64 = 5;
 pub const GRACE_MAX_S: u64 = 24 * 3600;
 pub const DEFAULT_GRACE_S: u64 = 300;
+/// `grace.away`: grace when the user is away (screen locked or idle).
+pub const DEFAULT_AWAY_S: u64 = 30;
+pub const AWAY_MIN_S: u64 = 1;
+/// `presence.idle_away`: input idle this long counts as away.
+pub const DEFAULT_IDLE_AWAY_S: u64 = 300;
+pub const IDLE_AWAY_MIN_S: u64 = 10;
 pub const DEFAULT_SERVER: &str = "https://ntfy.sh";
 pub const PROJECT_MAX_BYTES: u64 = 64 << 10;
 const USER_MAX_BYTES: u64 = 1 << 20;
@@ -53,6 +64,27 @@ pub struct Grace {
     pub question: u64,
     pub permission: u64,
     pub blocked: u64,
+    /// Grace while the user is away; ≤ every category grace.
+    pub away: u64,
+}
+
+impl Grace {
+    fn min_category(&self) -> u64 {
+        self.question.min(self.permission).min(self.blocked)
+    }
+}
+
+/// `presence.mode`: `auto` probes presence; `off` is v0.1 behaviour.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PresenceMode {
+    Auto,
+    Off,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Presence {
+    pub mode: PresenceMode,
+    pub idle_away: u64,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -66,6 +98,7 @@ pub struct Config {
     pub training_collect: bool,
     /// `[stats] enabled`: the local idle ledger (user config only).
     pub stats_enabled: bool,
+    pub presence: Presence,
 }
 
 impl Default for Config {
@@ -75,6 +108,7 @@ impl Default for Config {
                 question: DEFAULT_GRACE_S,
                 permission: DEFAULT_GRACE_S,
                 blocked: DEFAULT_GRACE_S,
+                away: DEFAULT_AWAY_S,
             },
             alerts_completion: false,
             alerts_info: false,
@@ -88,6 +122,10 @@ impl Default for Config {
             },
             training_collect: false,
             stats_enabled: true,
+            presence: Presence {
+                mode: PresenceMode::Auto,
+                idle_away: DEFAULT_IDLE_AWAY_S,
+            },
         }
     }
 }
@@ -219,6 +257,7 @@ pub fn load(cwd: Option<&Path>) -> Loaded {
                         question: g,
                         permission: g,
                         blocked: g,
+                        away: out.config.grace.away.min(g),
                     }
                 }
                 None => out
@@ -233,6 +272,8 @@ pub fn load(cwd: Option<&Path>) -> Loaded {
             ));
         }
     }
+    let g = &mut out.config.grace;
+    g.away = g.away.min(g.min_category());
     out
 }
 
@@ -284,6 +325,7 @@ fn display_key(k: &str) -> String {
 }
 
 fn apply_user(out: &mut Loaded, t: &toml::Table) {
+    let mut away_set = false;
     for (key, v) in leaves(t) {
         let c = &mut out.config;
         let bad = |out: &mut Vec<Issue>, p| out.push(issue("user", &key, p));
@@ -301,6 +343,28 @@ fn apply_user(out: &mut Loaded, t: &toml::Table) {
                     None => bad(&mut out.errors, "expected a duration between 5s and 24h"),
                 }
             }
+            "grace.away" => match v
+                .as_str()
+                .and_then(|s| parse_duration(s, AWAY_MIN_S, GRACE_MAX_S))
+            {
+                Some(g) => {
+                    c.grace.away = g;
+                    away_set = true;
+                }
+                None => bad(&mut out.errors, "expected a duration between 1s and 24h"),
+            },
+            "presence.mode" => match v.as_str() {
+                Some("auto") => c.presence.mode = PresenceMode::Auto,
+                Some("off") => c.presence.mode = PresenceMode::Off,
+                _ => bad(&mut out.errors, "expected \"auto\" or \"off\""),
+            },
+            "presence.idle_away" => match v
+                .as_str()
+                .and_then(|s| parse_duration(s, IDLE_AWAY_MIN_S, GRACE_MAX_S))
+            {
+                Some(d) => c.presence.idle_away = d,
+                None => bad(&mut out.errors, "expected a duration between 10s and 24h"),
+            },
             "alerts.completion" | "alerts.info" => match v.as_bool() {
                 Some(b) if key == "alerts.completion" => c.alerts_completion = b,
                 Some(b) => c.alerts_info = b,
@@ -353,6 +417,15 @@ fn apply_user(out: &mut Loaded, t: &toml::Table) {
                 .push(issue("user", &display_key(&key), "unknown key, ignored")),
         }
     }
+    let g = &mut out.config.grace;
+    if away_set && g.away > g.min_category() {
+        out.errors.push(issue(
+            "user",
+            "grace.away",
+            "must not exceed any category grace",
+        ));
+        g.away = DEFAULT_AWAY_S;
+    }
 }
 
 fn apply_project_file(out: &mut Loaded, path: &Path) {
@@ -392,6 +465,15 @@ fn apply_project_file(out: &mut Loaded, path: &Path) {
                 };
                 *slot = (*slot).min(g);
             }
+            "grace.away" => match v
+                .as_str()
+                .and_then(|s| parse_duration(s, AWAY_MIN_S, GRACE_MAX_S))
+            {
+                Some(g) => c.grace.away = c.grace.away.min(g),
+                None => out
+                    .warnings
+                    .push(issue("project", &key, "invalid duration, ignored")),
+            },
             "alerts.completion" => match v.as_bool() {
                 Some(b) => c.alerts_completion = b,
                 None => {
@@ -511,5 +593,60 @@ mod tests {
         assert_eq!(l.config.classifier_mode, ClassifierMode::Model);
         assert_eq!(l.config.classifier_lean, Lean::Alert);
         assert_eq!(l.warnings.len(), 2);
+    }
+
+    #[test]
+    fn grace_away_and_presence() {
+        let mut l = Loaded::default();
+        assert_eq!(l.config.grace.away, DEFAULT_AWAY_S);
+        assert_eq!(l.config.presence.mode, PresenceMode::Auto);
+        let t: toml::Table = toml::from_str(
+            "[grace]\naway = \"10s\"\n[presence]\nmode = \"off\"\nidle_away = \"2m\"\n",
+        )
+        .unwrap();
+        apply_user(&mut l, &t);
+        assert!(l.errors.is_empty(), "{:?}", l.errors);
+        assert_eq!(l.config.grace.away, 10);
+        assert_eq!(l.config.presence.mode, PresenceMode::Off);
+        assert_eq!(l.config.presence.idle_away, 120);
+
+        // Above a category grace: error, default used.
+        let mut l = Loaded::default();
+        let t: toml::Table = toml::from_str("[grace]\nquestion = \"1m\"\naway = \"2m\"\n").unwrap();
+        apply_user(&mut l, &t);
+        assert_eq!(l.errors.len(), 1);
+        assert_eq!(l.errors[0].key, "grace.away");
+        assert_eq!(l.config.grace.away, DEFAULT_AWAY_S);
+
+        let mut l = Loaded::default();
+        let t: toml::Table =
+            toml::from_str("[grace]\naway = \"0s\"\n[presence]\nmode = \"on\"\n").unwrap();
+        apply_user(&mut l, &t);
+        assert_eq!(l.errors.len(), 2);
+    }
+
+    #[test]
+    fn project_may_only_shorten_grace_away() {
+        let dir =
+            std::env::temp_dir().join(format!("tap-cfg-unit-{}", crate::state::random_hex(6)));
+        std::fs::create_dir_all(&dir).unwrap();
+        let p = dir.join("p.toml");
+        std::fs::write(
+            &p,
+            "[grace]\naway = \"5s\"\n[presence]\nmode = \"off\"\nidle_away = \"10s\"\n",
+        )
+        .unwrap();
+        let mut l = Loaded::default();
+        apply_project_file(&mut l, &p);
+        assert_eq!(l.config.grace.away, 5);
+        assert_eq!(l.config.presence, Config::default().presence);
+        let ignored: Vec<_> = l.warnings.iter().map(|w| w.key.as_str()).collect();
+        assert_eq!(ignored, ["presence.idle_away", "presence.mode"]);
+
+        std::fs::write(&p, "[grace]\naway = \"2m\"\n").unwrap();
+        let mut l = Loaded::default();
+        apply_project_file(&mut l, &p);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(l.config.grace.away, DEFAULT_AWAY_S, "cannot lengthen");
     }
 }

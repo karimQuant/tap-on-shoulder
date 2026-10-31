@@ -235,6 +235,13 @@ pub struct Episode {
     /// episode is never recorded again.
     #[serde(default)]
     pub finished_reason: Option<String>,
+    /// Effective `grace.away` (s) when armed; project config may shorten it.
+    /// `None` (armed over SSH, or state from v0.1): presence is ignored.
+    #[serde(default)]
+    pub grace_away_s: Option<i64>,
+    /// The last claim happened before `due_at` because the user was away.
+    #[serde(default)]
+    pub sent_early: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

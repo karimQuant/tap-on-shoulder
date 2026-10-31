@@ -4,7 +4,7 @@
 //!   basename is `claude`, or `node` with an argv entry containing `claude`.
 //!   Otherwise fall back to the parent of the hook's `sh`.
 //! - Identity: Linux `/proc/<pid>/stat` field 22; macOS `ps -o stat=,lstart=`.
-//!   A zombie counts as gone on both. Every `ps` runs with `LC_ALL=C TZ=UTC0`.
+//!   A zombie counts as gone on both. Every `ps` is `/bin/ps` and runs with `LC_ALL=C TZ=UTC0`.
 //! - Descendants: `/proc` on Linux, `ps -axo pid=,ppid=,etime=,comm=` elsewhere.
 
 use std::collections::HashMap;
@@ -153,11 +153,15 @@ fn argv(pid: i32) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Absolute path: `PATH` is not trusted. Present on Linux and macOS.
+#[cfg_attr(target_os = "linux", allow(dead_code))]
+const PS: &str = "/bin/ps";
+
 #[cfg_attr(target_os = "linux", allow(dead_code))]
 fn ps(args: &[&str]) -> Option<String> {
     // Fixed locale and time zone: `lstart` text must not change between a
     // hook and the sweeper, whatever their environments.
-    let out = Command::new("ps")
+    let out = Command::new(PS)
         .args(args)
         .env("LC_ALL", "C")
         .env("TZ", "UTC0")

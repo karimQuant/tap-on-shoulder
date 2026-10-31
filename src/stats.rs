@@ -124,16 +124,9 @@ pub fn ledger_path() -> Option<PathBuf> {
     state::data_dir().map(|d| d.join("stats").join("waits.jsonl"))
 }
 
-/// Record one finished wait. `early` is the presence lane's flag. Never
-/// fails; never blocks longer than the lock budget.
-pub fn record(
-    ep: &Episode,
-    reason: &str,
-    closed: i64,
-    project: &str,
-    cfg: &Config,
-    early: Option<bool>,
-) {
+/// Record one finished wait. Never fails; never blocks longer than the lock
+/// budget.
+pub fn record(ep: &Episode, reason: &str, closed: i64, project: &str, cfg: &Config) {
     if !cfg.stats_enabled || !recorded_category(ep.category) {
         return;
     }
@@ -151,7 +144,7 @@ pub fn record(
         reason: reason.to_string(),
         user,
         project,
-        early,
+        early: ep.sent_early.then_some(true),
     };
     if append(&line).is_err() {
         Entry::new("stats").kind("stats_write_failed").write();

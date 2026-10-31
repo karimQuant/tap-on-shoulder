@@ -32,7 +32,7 @@ The plugin keeps one small state file per session, in the plugin's data director
 - pending tool calls: tool name, `tool_use_id`, and a truncated SHA-256 hash of the tool input (never the input itself)
 - the Claude Code process ID and start time, to tell whether the session is still running
 
-It **never** stores the full assistant message. Old state expires automatically.
+It **never** stores the full assistant message. Old state expires automatically. Presence readings (v0.2) are kept only in the sweeper's memory for 5 seconds; the state file records at most whether a tap was sent early (`sent_early`), never a presence timeline.
 
 The **idle ledger** (`stats/waits.jsonl`, on by default, read by `tap stats`) keeps one line per finished question, permission prompt, or blocker: when it opened, when it was tapped, when it ended, its category, a fixed close reason (such as `user_prompt` or `session_end`), and the project folder name. It never holds message text, summaries, or tool names; with `privacy = "category-only"` the project name is left out too. It is a local record of when you were at work, so it can be turned off with `[stats] enabled = false` (user config only; a project file cannot change it). Past 1 MiB it keeps only the last 90 days.
 
@@ -50,6 +50,15 @@ The **idle ledger** (`stats/waits.jsonl`, on by default, read by `tap stats`) ke
 - Add MCP servers or tools to your sessions.
 
 It is an observer. The only outputs are a local log and one ntfy message per episode.
+
+## Presence probes (v0.2)
+
+With `presence.mode = "auto"` (the default) the sweeper asks, at most once per pass and only while an episode could tap early, whether you are away:
+
+- **GNOME:** `/usr/bin/gdbus call --session` to `org.gnome.Mutter.IdleMonitor.GetIdletime` and `org.gnome.ScreenSaver.GetActive`.
+- **macOS:** `/usr/sbin/ioreg -c IOHIDSystem -d 4 -k HIDIdleTime`.
+
+Each command runs by absolute path with an empty environment (only `LC_ALL=C` and, for gdbus, `DBUS_SESSION_BUS_ADDRESS`; the `$XDG_RUNTIME_DIR/bus` fallback is used only if it is a socket owned by you), stdin and stderr closed, stdout capped at 4 KiB, and is killed after 500 ms. Output must be exactly one integer or boolean in the expected shape; anything else reads as *unknown*, which means the normal grace. Nothing is sent anywhere. `presence.mode = "off"` disables the probes. The existing `ps` calls run as `/bin/ps` for the same reason: `PATH` is not trusted.
 
 ## Threat model
 

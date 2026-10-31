@@ -10,6 +10,7 @@ pub mod contract;
 pub mod hook;
 pub mod log;
 pub mod notify;
+pub mod presence;
 pub mod proc;
 pub mod sanitize;
 pub mod state;

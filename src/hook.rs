@@ -370,6 +370,7 @@ impl Ctx<'_> {
                 }
             }
             ep.due_at = ep.opened_at + self.cfg.grace_for(ep.category) as i64;
+            ep.grace_away_s = crate::presence::grace_away(self.cfg);
             transition = if rebind { "rebound" } else { "rearmed" };
         } else {
             let grace = self.cfg.grace_for(category) as i64;
@@ -393,6 +394,8 @@ impl Ctx<'_> {
                 closed_reason: None,
                 notified_at: None,
                 finished_reason: None,
+                grace_away_s: crate::presence::grace_away(self.cfg),
+                sent_early: false,
             };
             set_binding(&mut ep, binding);
             self.state.episode = Some(ep);
@@ -457,7 +460,7 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
         if let Loaded::Ok(s) = store.load(sid) {
             if let Some(ep) = s.episode.as_ref().filter(|e| crate::stats::unrecorded(e)) {
                 let cfg = config::load(None).config;
-                crate::stats::record(ep, "session_end", state::now(), &s.project, &cfg, None);
+                crate::stats::record(ep, "session_end", state::now(), &s.project, &cfg);
             }
         }
         let _ = store.remove(sid);
@@ -669,11 +672,11 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
         // hook closed, finished, or rebound a wait).
         let project = ctx.state.project.as_str();
         if let Some(prev) = &ctx.rebound {
-            crate::stats::record(prev, "rebind", now, project, cfg, None);
+            crate::stats::record(prev, "rebind", now, project, cfg);
         }
         let after = ctx.state.episode.as_ref();
         if let (Some(ep), Some(reason)) = (after, crate::stats::ended_by(before.as_ref(), after)) {
-            crate::stats::record(ep, &reason, now, project, cfg, None);
+            crate::stats::record(ep, &reason, now, project, cfg);
         }
     }
     drop(_lock);
