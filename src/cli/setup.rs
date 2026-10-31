@@ -61,7 +61,11 @@ pub fn config_text(server: &str, topic: &str) -> String {
          info = false\n\
          \n\
          [training]\n\
-         collect = false\n"
+         collect = false\n\
+         \n\
+         # Local idle ledger (stats/waits.jsonl): timings only, no message text.\n\
+         [stats]\n\
+         enabled = true\n"
     )
 }
 
@@ -109,6 +113,7 @@ pub fn run(args: &[String]) -> i32 {
         if let Some(topic) = loaded.config.ntfy.topic {
             println!("subscribe: {}/{}", loaded.config.ntfy.server, topic);
         }
+        print_ledger_note(loaded.config.stats_enabled);
         return 0;
     }
     let dir = path.parent().expect("config path has a parent");
@@ -140,7 +145,23 @@ pub fn run(args: &[String]) -> i32 {
     println!("wrote {}", path.display());
     println!("subscribe: {server}/{topic}");
     println!("Open that URL in the ntfy app (or browser), then run `tap test`.");
+    print_ledger_note(true);
     0
+}
+
+/// Setup tells the user about the idle ledger and its off switch.
+fn print_ledger_note(enabled: bool) {
+    let path = crate::stats::ledger_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "${CLAUDE_PLUGIN_DATA}/stats/waits.jsonl".into());
+    if enabled {
+        println!(
+            "idle ledger: on; records how long agents waited on you at {path} (local only, no message text; see `tap stats`); {}",
+            crate::stats::OFF_HINT
+        );
+    } else {
+        println!("idle ledger: off (`[stats] enabled = false`)");
+    }
 }
 
 #[cfg(test)]
@@ -162,5 +183,6 @@ mod tests {
         let text = config_text("https://ntfy.sh", "tap-abc");
         let t: toml::Table = toml::from_str(&text).unwrap();
         assert_eq!(t["notify"]["ntfy"]["topic"].as_str(), Some("tap-abc"));
+        assert_eq!(t["stats"]["enabled"].as_bool(), Some(true));
     }
 }

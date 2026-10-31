@@ -13,4 +13,5 @@ pub mod notify;
 pub mod proc;
 pub mod sanitize;
 pub mod state;
+pub mod stats;
 pub mod sweep;

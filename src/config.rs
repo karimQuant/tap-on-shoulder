@@ -3,7 +3,8 @@
 //! 1. User config: `${XDG_CONFIG_HOME:-~/.config}/tap-on-shoulder/config.toml`.
 //! 2. Project config: `<cwd>/.claude/tap-on-shoulder.toml` (≤ 64 KiB). Only
 //!    `grace.*` (clamped to the user's value or lower) and `alerts.completion`
-//!    are honoured; every other key is ignored with a warning.
+//!    are honoured; every other key (including `stats.*`) is ignored with a
+//!    warning.
 //! 3. `TAP_GRACE_OVERRIDE` replaces every grace period, only with `TAP_DEV=1`.
 
 use std::path::{Path, PathBuf};
@@ -63,6 +64,8 @@ pub struct Config {
     pub classifier_lean: Lean,
     pub ntfy: Ntfy,
     pub training_collect: bool,
+    /// `[stats] enabled`: the local idle ledger (user config only).
+    pub stats_enabled: bool,
 }
 
 impl Default for Config {
@@ -84,6 +87,7 @@ impl Default for Config {
                 privacy: Privacy::Summary,
             },
             training_collect: false,
+            stats_enabled: true,
         }
     }
 }
@@ -340,6 +344,10 @@ fn apply_user(out: &mut Loaded, t: &toml::Table) {
                 Some(b) => c.training_collect = b,
                 None => bad(&mut out.errors, "expected true or false"),
             },
+            "stats.enabled" => match v.as_bool() {
+                Some(b) => c.stats_enabled = b,
+                None => bad(&mut out.errors, "expected true or false"),
+            },
             _ => out
                 .warnings
                 .push(issue("user", &display_key(&key), "unknown key, ignored")),
@@ -436,7 +444,7 @@ mod tests {
     fn project_only_lowers_grace_and_sets_completion() {
         let mut l = Loaded::default();
         l.config.grace.question = 600;
-        let text = "[grace]\nquestion = \"1h\"\npermission = \"10s\"\n[alerts]\ncompletion = true\ninfo = true\n[notify.ntfy]\nserver = \"https://evil.example\"\ntopic = \"evil\"\n[training]\ncollect = true\n";
+        let text = "[grace]\nquestion = \"1h\"\npermission = \"10s\"\n[alerts]\ncompletion = true\ninfo = true\n[notify.ntfy]\nserver = \"https://evil.example\"\ntopic = \"evil\"\n[training]\ncollect = true\n[stats]\nenabled = false\n";
         let dir =
             std::env::temp_dir().join(format!("tap-cfg-unit-{}", crate::state::random_hex(6)));
         std::fs::create_dir_all(&dir).unwrap();
@@ -450,11 +458,13 @@ mod tests {
         assert!(!l.config.alerts_info);
         assert_eq!(l.config.ntfy, Config::default().ntfy);
         assert!(!l.config.training_collect);
+        assert!(l.config.stats_enabled);
         let ignored: Vec<_> = l.warnings.iter().map(|w| w.key.as_str()).collect();
         assert!(ignored.contains(&"notify.ntfy.server"));
         assert!(ignored.contains(&"notify.ntfy.topic"));
         assert!(ignored.contains(&"training.collect"));
         assert!(ignored.contains(&"alerts.info"));
+        assert!(ignored.contains(&"stats.enabled"));
     }
 
     #[test]

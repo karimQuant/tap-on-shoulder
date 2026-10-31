@@ -185,10 +185,13 @@ impl Sweeper {
         Some(out)
     }
 
-    fn close(&self, sid: &str, ep: &Episode, status: EpisodeStatus, reason: &'static str) {
+    fn close(&self, sid: &str, ep: &Episode, status: EpisodeStatus, reason: &'static str) -> bool {
         let done = self.guarded(sid, &ep.id, ep.status, ep.attempts, |e| {
             e.status = status;
             e.closed_reason = Some(reason.into());
+            if status == EpisodeStatus::SentUncertain {
+                e.notified_at = e.sending_since.or(Some(state::now()));
+            }
             true
         });
         if done.is_some() {
@@ -197,6 +200,7 @@ impl Sweeper {
                 .kind(reason)
                 .write();
         }
+        done.is_some()
     }
 
     fn session(&mut self, sid: &str) -> Option<i64> {
@@ -223,7 +227,10 @@ impl Sweeper {
         // D4/R6: session liveness.
         if let Some(c) = &snap.claude {
             if !crate::proc::same_process(c) {
-                self.close(sid, &ep, EpisodeStatus::Closed, "session_gone");
+                if self.close(sid, &ep, EpisodeStatus::Closed, "session_gone") {
+                    let cfg = config::load(None).config;
+                    crate::stats::record(&ep, "session_gone", now, &snap.project, &cfg, None);
+                }
                 return None;
             }
         }
@@ -319,7 +326,10 @@ impl Sweeper {
             |e| {
                 e.sending_since = None;
                 match &result {
-                    Ok(()) => e.status = EpisodeStatus::Notified,
+                    Ok(()) => {
+                        e.status = EpisodeStatus::Notified;
+                        e.notified_at = Some(now);
+                    }
                     Err(SendError::Connect(_)) => {
                         e.attempts += 1;
                         if e.attempts >= MAX_ATTEMPTS {
@@ -338,6 +348,7 @@ impl Sweeper {
                     Err(SendError::Uncertain(_)) => {
                         e.attempts += 1;
                         e.status = EpisodeStatus::SentUncertain;
+                        e.notified_at = Some(now);
                     }
                 }
                 true

@@ -227,6 +227,14 @@ pub struct Episode {
     pub postponed_s: i64,
     #[serde(default)]
     pub closed_reason: Option<String>,
+    /// When a tap was sent (`notified`) or probably sent (`sent_uncertain`).
+    #[serde(default)]
+    pub notified_at: Option<i64>,
+    /// Set when a user action ends a `notified | sent_uncertain | failed`
+    /// episode (the idle-ledger "finish" step): the ledger reason. A finished
+    /// episode is never recorded again.
+    #[serde(default)]
+    pub finished_reason: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

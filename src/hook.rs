@@ -275,6 +275,8 @@ struct Ctx<'a> {
     changed: bool,
     /// An arming event ran (opens, re-arms, or suppresses an episode).
     armed: bool,
+    /// The episode as it was before a rebind answered it (idle ledger).
+    rebound: Option<Episode>,
 }
 
 impl Ctx<'_> {
@@ -284,11 +286,31 @@ impl Ctx<'_> {
 
     /// Close the episode if it is open or in flight and `pred` matches.
     /// A hook close always wins over an in-flight send (write guard).
+    ///
+    /// A user action on a tapped episode (`notified | sent_uncertain |
+    /// failed`) instead marks it finished for the idle ledger; its status,
+    /// and so tap behaviour, is unchanged.
     fn close_if(&mut self, reason: &'static str, pred: impl Fn(&Episode) -> bool) {
         let event = self.event;
         let sid = self.state.session_id.clone();
         if let Some(ep) = self.state.episode.as_mut() {
             let live = matches!(ep.status, EpisodeStatus::Open | EpisodeStatus::Sending);
+            if !live
+                && ep.status != EpisodeStatus::Closed
+                && ep.finished_reason.is_none()
+                && crate::stats::is_user_action(reason)
+                && pred(ep)
+            {
+                ep.finished_reason = Some(reason.into());
+                self.changed = true;
+                Entry::new(event)
+                    .session(&sid)
+                    .episode(&ep.id)
+                    .transition("finished")
+                    .category(ep.category)
+                    .kind(reason)
+                    .write();
+            }
             if live && pred(ep) {
                 ep.status = EpisodeStatus::Closed;
                 ep.closed_reason = Some(reason.into());
@@ -332,6 +354,7 @@ impl Ctx<'_> {
                 _ => false,
             };
             if rebind {
+                self.rebound = Some(ep.clone());
                 ep.opened_at = now;
                 ep.postponed_s = 0;
                 ep.confirmed_at = None;
@@ -368,6 +391,8 @@ impl Ctx<'_> {
                 sending_since: None,
                 postponed_s: 0,
                 closed_reason: None,
+                notified_at: None,
+                finished_reason: None,
             };
             set_binding(&mut ep, binding);
             self.state.episode = Some(ep);
@@ -429,6 +454,12 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
     };
 
     if event == "SessionEnd" {
+        if let Loaded::Ok(s) = store.load(sid) {
+            if let Some(ep) = s.episode.as_ref().filter(|e| crate::stats::unrecorded(e)) {
+                let cfg = config::load(None).config;
+                crate::stats::record(ep, "session_end", state::now(), &s.project, &cfg, None);
+            }
+        }
         let _ = store.remove(sid);
         Entry::new(event)
             .session(sid)
@@ -465,7 +496,9 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
         now,
         changed: false,
         armed: false,
+        rebound: None,
     };
+    let before = ctx.state.episode.clone();
 
     let mut out = None;
     let mut user_prompt = false;
@@ -631,6 +664,16 @@ fn handle(event: &'static str, input: &HookInput) -> Option<String> {
         if store.save(&ctx.state).is_err() {
             Entry::new(event).session(sid).kind("state_write").write();
             return out;
+        }
+        // Idle ledger: the one hook-side call (records nothing unless this
+        // hook closed, finished, or rebound a wait).
+        let project = ctx.state.project.as_str();
+        if let Some(prev) = &ctx.rebound {
+            crate::stats::record(prev, "rebind", now, project, cfg, None);
+        }
+        let after = ctx.state.episode.as_ref();
+        if let (Some(ep), Some(reason)) = (after, crate::stats::ended_by(before.as_ref(), after)) {
+            crate::stats::record(ep, &reason, now, project, cfg, None);
         }
     }
     drop(_lock);
