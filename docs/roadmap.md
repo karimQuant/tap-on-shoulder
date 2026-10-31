@@ -16,7 +16,7 @@
 - [x] ntfy notifications with redaction and privacy modes
 - [x] `/tap-on-shoulder:setup`, `:test`, `:doctor`; `tap classify` and `tap label` in the terminal
 - [x] Real end-to-end test against Claude Code (`scripts/e2e.sh`)
-- [ ] First signed binary prerelease (`bin-v0.1.0-alpha.1`)
+- [x] First signed binary prerelease (`bin-v0.1.0-alpha.1`)
 - [ ] Release bar for the classifier: `needs_decision` recall ≥ 0.95 and macro-F1 ≥ 0.85 on at least 200 real, hand-labelled message endings (collect them with `training.collect` + `tap label`)
 
 ## Later

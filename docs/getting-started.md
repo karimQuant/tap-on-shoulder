@@ -1,7 +1,7 @@
 # Getting started
 
-> [!IMPORTANT]
-> **Prebuilt binaries arrive with the first `bin-v*` prerelease.** Until then, a marketplace install has no `tap` binary to download, and the slash commands print how to build from source. Use [From source](#from-source-development) for now.
+> [!NOTE]
+> **Alpha.** The first prebuilt binaries are out (`bin-v0.1.0-alpha.1`, Linux and macOS, x64 and arm64). The classifier is a preview trained on synthetic data.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Inside Claude Code:
 ```
 
 > [!TIP]
-> Pin an exact release with `karimQuant/tap-on-shoulder#v0.1.0` so you know what code runs. Update with `claude plugin update tap-on-shoulder@tap-on-shoulder`.
+> Pin an exact release with `karimQuant/tap-on-shoulder#v0.1.0-alpha.1` so you know what code runs. Update with `claude plugin update tap-on-shoulder@tap-on-shoulder`.
 
 The plugin downloads the `tap` binary for your platform into its data directory, the first time a hook runs or a slash command needs it. It checks the binary against a SHA-256 checksum pinned in this repository before using it. See [Security](security.md#supply-chain).
 
