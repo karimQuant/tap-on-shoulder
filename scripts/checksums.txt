@@ -1,3 +1,7 @@
 version=0.2.0-alpha.1
-# SHA-256 of each release binary, one "<sha256>  tap-<target>" line per target.
-# Filled from that release's SHA256SUMS after gh attestation verify passes.
+# SHA-256 of each release binary, from SHA256SUMS of release bin-v0.2.0-alpha.1,
+# copied after gh attestation verify passed for every asset.
+97730f7fef0a27d4b1720fd8c935a54fd7600cea1755435e641aec26596d638e  tap-aarch64-apple-darwin
+ee3900fcb2739644413bcbb91b8257777b0438fe82750139f701d0510d94da18  tap-aarch64-unknown-linux-musl
+9dc977d38f56e08be2753230df5268b56b8d9de519a3e497c301d999b250a2ce  tap-x86_64-apple-darwin
+403e8700f35362500741c6fe094acf9ecdbdd89a1c5725d1c0f000c7c010f9ea  tap-x86_64-unknown-linux-musl
