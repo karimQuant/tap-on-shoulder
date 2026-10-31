@@ -380,6 +380,63 @@ fn s17_stats_write_failure_still_taps() {
     }
 }
 
+/// `n` bytes or more of recent, valid, user-closed ledger lines.
+fn recent_seed(min_bytes: usize) -> String {
+    let t = now();
+    let l = with_project(
+        line(t - 3600 - 60, t - 3600, None, "user_prompt", true),
+        "seed",
+    )
+    .to_string();
+    let mut seed = String::with_capacity(min_bytes + l.len() + 1);
+    while seed.len() < min_bytes {
+        seed.push_str(&l);
+        seed.push('\n');
+    }
+    seed
+}
+
+/// A reply that would append a line, with the ledger left untouched and the
+/// failure logged; the tap still goes out and `tap stats` still reads it.
+fn assert_capped(env: &TestEnv, mock: &MockNtfy, s: &str, seed: &str) {
+    tapped_question(env, mock, s, 1);
+    hook(env, &user_prompt(s));
+    assert!(ledger_text(env) == seed, "capped ledger was appended to");
+    assert!(env.log_text().contains("stats_write_failed"));
+    let r = stats_json(env, &[]);
+    assert_eq!(r["skipped"], 0);
+    assert!(r["waits"].as_u64().unwrap() > 1000, "{r}");
+    let out = env.run(&["stats"]);
+    assert!(out.status.success());
+}
+
+#[test]
+fn s18b_ledger_capped_when_rotation_fails_or_oversized() {
+    // Rotation fails (read-only stats dir): no append past 1 MiB.
+    {
+        let mock = MockNtfy::start(Mode::Ok);
+        let env = env_for(&mock.url);
+        let dir = stats_dir(&env);
+        mkdir_private(&dir);
+        let seed = recent_seed((1 << 20) + 4096);
+        std::fs::write(ledger_path(&env), &seed).unwrap();
+        std::fs::write(dir.join("waits.lock"), "").unwrap();
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o500)).unwrap();
+        assert_capped(&env, &mock, "s18r", &seed);
+        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700)).unwrap();
+    }
+    // Far beyond the rotation size: appends stop without rewriting.
+    {
+        let mock = MockNtfy::start(Mode::Ok);
+        let env = env_for(&mock.url);
+        let dir = stats_dir(&env);
+        mkdir_private(&dir);
+        let seed = recent_seed((4 << 20) + 4096);
+        std::fs::write(ledger_path(&env), &seed).unwrap();
+        assert_capped(&env, &mock, "s18c", &seed);
+    }
+}
+
 #[test]
 fn s18_concurrent_appends_and_rotation_valid_jsonl() {
     let mock = MockNtfy::start(Mode::Ok);

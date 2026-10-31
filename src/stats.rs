@@ -10,7 +10,11 @@
 //!   delays or blocks a tap.
 //! - Appends hold `stats/waits.lock` (bounded non-blocking wait, ≤ 50 ms), no
 //!   fsync. Past 1 MiB the file is rewritten under the same lock keeping the
-//!   last 90 days.
+//!   last 90 days. If that rewrite fails, the next append retries it first
+//!   and appends nothing while it keeps failing; past 4 MiB (grown by
+//!   something else) appends stop. Either way `kind=stats_write_failed` is
+//!   logged and the file never grows without bound; `tap stats` still reads
+//!   it.
 
 use std::collections::HashMap;
 use std::io::{self, Write};
@@ -35,6 +39,8 @@ pub const KEEP_S: i64 = 90 * 86_400;
 const ROTATE_TARGET_BYTES: usize = 768 << 10;
 /// Each wait counts at most this long toward blocked-on-you time.
 pub const CAP_S: i64 = 2 * 3600;
+/// Never append to a ledger larger than this (4 × [`ROTATE_BYTES`]).
+pub const HARD_CAP_BYTES: u64 = 4 * ROTATE_BYTES;
 const LOCK_BUDGET: Duration = Duration::from_millis(50);
 const LOCK_STEP: Duration = Duration::from_millis(5);
 /// Reading for rotation or `tap stats`; anything bigger is refused.
@@ -164,6 +170,20 @@ fn lock(path: &std::path::Path) -> io::Result<FileLock> {
     }
 }
 
+fn open_append(path: &std::path::Path) -> io::Result<(std::fs::File, u64)> {
+    let f = std::fs::OpenOptions::new()
+        .append(true)
+        .create(true)
+        .mode(0o600)
+        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
+        .open(path)?;
+    let md = f.metadata()?;
+    if !md.file_type().is_file() {
+        return Err(io::Error::other("not_a_file"));
+    }
+    Ok((f, md.len()))
+}
+
 fn append(line: &Line) -> io::Result<()> {
     let data = state::data_dir().ok_or_else(|| io::Error::other("no_data_dir"))?;
     if !data.is_dir() {
@@ -172,20 +192,24 @@ fn append(line: &Line) -> io::Result<()> {
     let dir = state::private_subdir(&data, "stats")?;
     let _lock = lock(&dir.join("waits.lock"))?;
     let path = dir.join("waits.jsonl");
-    let mut f = std::fs::OpenOptions::new()
-        .append(true)
-        .create(true)
-        .mode(0o600)
-        .custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
-        .open(&path)?;
-    let md = f.metadata()?;
-    if !md.file_type().is_file() {
-        return Err(io::Error::other("not_a_file"));
+    let (mut f, mut len) = open_append(&path)?;
+    if len > HARD_CAP_BYTES {
+        return Err(io::Error::other("ledger_over_cap"));
+    }
+    if len > ROTATE_BYTES {
+        // An earlier rotation failed: retry it, and append nothing until it
+        // works, so the file cannot grow without bound.
+        drop(f);
+        rotate(&path, line.closed)?;
+        (f, len) = open_append(&path)?;
+        if len > ROTATE_BYTES {
+            return Err(io::Error::other("ledger_over_cap"));
+        }
     }
     let mut bytes = serde_json::to_vec(line).map_err(io::Error::other)?;
     bytes.push(b'\n');
     f.write_all(&bytes)?;
-    if md.len() + bytes.len() as u64 > ROTATE_BYTES {
+    if len + bytes.len() as u64 > ROTATE_BYTES {
         drop(f);
         rotate(&path, line.closed)?;
     }
