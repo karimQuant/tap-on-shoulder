@@ -65,6 +65,7 @@ pub fn run() -> i32 {
     }
 
     report_state();
+    report_stats(c);
 
     if crate::cli::training::at_cap() {
         println!("training: collected.jsonl reached its 10 MiB cap; collection stopped. Run `tap label`.");
@@ -76,6 +77,23 @@ pub fn run() -> i32 {
     } else {
         0
     }
+}
+
+/// The idle ledger: on/off, path, line count, how to turn it off.
+fn report_stats(c: &crate::config::Config) {
+    use crate::stats;
+    let path = stats::ledger_path()
+        .map(|p| p.display().to_string())
+        .unwrap_or_else(|| "(CLAUDE_PLUGIN_DATA unset)".into());
+    if !c.stats_enabled {
+        println!("stats: idle ledger off; {path} is not written");
+        return;
+    }
+    let lines = stats::line_count().unwrap_or(0);
+    println!(
+        "stats: idle ledger on, {path} ({lines} line(s); local only, no message text); {}",
+        stats::OFF_HINT
+    );
 }
 
 /// The user's classifier settings, the classifier they select, and the

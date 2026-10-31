@@ -2,7 +2,7 @@ use std::io::Write;
 use std::process::ExitCode;
 
 const USAGE: &str =
-    "usage: tap <hook EVENT | sweep | setup [--force] [--server URL] | test | doctor | label | classify | --version>";
+    "usage: tap <hook EVENT | sweep | setup [--force] [--server URL] | test | doctor | stats [--days N] [--json] | label | classify | --version>";
 
 fn main() -> ExitCode {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -32,6 +32,7 @@ fn main() -> ExitCode {
         Some("setup") => code(tap::cli::setup::run(&args[1..])),
         Some("test") => code(tap::cli::test_tap()),
         Some("doctor") => code(tap::cli::doctor::run()),
+        Some("stats") => code(tap::stats::run_cli(&args[1..])),
         Some("label") => code(tap::cli::label()),
         Some("classify") => code(tap::cli::classify_stdin()),
         Some("--version") | Some("-V") | Some("version") => {

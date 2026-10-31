@@ -1,5 +1,5 @@
 #!/bin/sh
-# tap-on-shoulder CLI wrapper:  tap.sh <setup|test|doctor|classify|label|--version> [args]
+# tap-on-shoulder CLI wrapper:  tap.sh <setup|test|doctor|stats|classify|label|--version> [args]
 #
 # The plugin's slash commands (commands/*.md) run this, and so can a terminal.
 # It finds the `tap` binary exactly as the hook shim does (tap-hook.sh
@@ -13,9 +13,9 @@ here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 shim=$here/tap-hook.sh
 
 case ${1:-} in
-  setup | test | doctor | classify | label | --version) ;;
+  setup | test | doctor | stats | classify | label | --version) ;;
   *)
-    printf '%s\n' 'usage: tap.sh <setup [--force] [--server URL] | test | doctor | classify | label | --version>' >&2
+    printf '%s\n' 'usage: tap.sh <setup [--force] [--server URL] | test | doctor | stats [--days N] [--json] | classify | label | --version>' >&2
     exit 2
     ;;
 esac
