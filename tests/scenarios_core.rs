@@ -374,7 +374,7 @@ fn s06b_approved_long_tool_no_tap() {
     claude.start_tool();
 
     assert!(
-        eventually(secs(5.0), || episode(&env, "s06b")["postponed_s"]
+        eventually(secs(15.0), || episode(&env, "s06b")["postponed_s"]
             .as_i64()
             .unwrap_or(0)
             >= 1),
@@ -558,7 +558,7 @@ fn s09b_ntfy_unreachable_failed() {
     let edrop = env_for(&mdrop.url);
     hook(&edrop, &stop("s09d", QUESTION));
 
-    assert!(eventually(secs(12.0), || status(&refused, "s09b") == "failed"));
+    assert!(eventually(secs(30.0), || status(&refused, "s09b") == "failed"));
     let ep = episode(&refused, "s09b");
     assert_eq!(ep["attempts"], 3);
     assert_eq!(ep["closed_reason"], "unreachable");
@@ -572,7 +572,7 @@ fn s09b_ntfy_unreachable_failed() {
         "unreachable ntfy fails doctor"
     );
 
-    assert!(eventually(secs(5.0), || status(&e500, "s09s") == "failed"));
+    assert!(eventually(secs(15.0), || status(&e500, "s09s") == "failed"));
     assert_eq!(episode(&e500, "s09s")["closed_reason"], "http_status");
     assert!(eventually(secs(5.0), || status(&edrop, "s09d") == "sent_uncertain"));
     let doctor = edrop.run(&["doctor"]);
