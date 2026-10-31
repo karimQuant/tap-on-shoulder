@@ -48,8 +48,8 @@ user: "You" {shape: person}
 
 session.hooks.arm -> classify.model: "Stop"
 classify.out -> core.state: "open episode"
-session.hooks.arm -> core.state: "open / bind / re-arm"
-session.hooks.disarm -> core.state: "close episode"
+session.hooks.arm -> core.state: "open"
+session.hooks.disarm -> core.state: "close"
 core.claim -> notify.ntfy: "send at most once"
 notify.ntfy -> user
 notify.rc -> user: "" {style.stroke-dash: 3}
